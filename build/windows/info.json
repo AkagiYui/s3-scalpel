@@ -5,11 +5,11 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "A s3-scalpel application",
-			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "My Product",
-			"Comments": "This is a comment"
+			"CompanyName": "AkagiYui",
+			"FileDescription": "S3 Scalpel — a surgical S3-compatible object storage client",
+			"LegalCopyright": "© 2026, AkagiYui",
+			"ProductName": "S3 Scalpel",
+			"Comments": "S3 Scalpel"
 		}
 	}
 }

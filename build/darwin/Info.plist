@@ -4,26 +4,31 @@
         <key>CFBundlePackageType</key>
             <string>APPL</string>
         <key>CFBundleName</key>
-            <string>My Product</string>
+            <string>S3 Scalpel</string>
         <key>CFBundleExecutable</key>
             <string>s3-scalpel</string>
         <key>CFBundleIdentifier</key>
-            <string>com.example.s3scalpel</string>
+            <string>com.akagiyui.s3_scalpel</string>
         <key>CFBundleVersion</key>
             <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>
-            <string>This is a comment</string>
+            <string>S3 Scalpel — a surgical S3-compatible object storage client</string>
         <key>CFBundleShortVersionString</key>
             <string>0.1.0</string>
         <key>CFBundleIconFile</key>
             <string>icons</string>
-        <key>CFBundleIconName</key>
-            <string>appicon</string>
         <key>LSMinimumSystemVersion</key>
             <string>10.15.0</string>
         <key>NSHighResolutionCapable</key>
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
-            <string>© 2026, My Company</string>
+            <string>© 2026, AkagiYui</string>
+        <key>LSApplicationCategoryType</key>
+            <string>public.app-category.developer-tools</string>
+        <key>NSAppTransportSecurity</key>
+            <dict>
+                <key>NSAllowsArbitraryLoads</key>
+                <true/>
+            </dict>
     </dict>
 </plist>

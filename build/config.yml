@@ -5,13 +5,13 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "My Company" # The name of the company
-  productName: "My Product" # The name of the application
-  productIdentifier: "com.mycompany.myproduct" # The unique product identifier
-  description: "A program that does X" # The application description
-  copyright: "(c) 2025, My Company" # Copyright text
-  comments: "Some Product Comments" # Comments
-  version: "0.0.1" # The application version
+  companyName: "AkagiYui" # The name of the company
+  productName: "S3 Scalpel" # The name of the application
+  productIdentifier: "com.akagiyui.s3_scalpel" # The unique product identifier
+  description: "A surgical S3-compatible object storage client" # The application description
+  copyright: "(c) 2026, AkagiYui" # Copyright text
+  comments: "S3 Scalpel — manage S3-compatible object storage" # Comments
+  version: "0.1.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

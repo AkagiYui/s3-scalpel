@@ -1,13 +1,10 @@
 [Desktop Entry]
 Version=1.0
-Name=My Product
-Comment=A s3-scalpel application
-# The Exec line includes %u to pass the URL to the application
+Name=S3 Scalpel
+Comment=A surgical S3-compatible object storage client
 Exec=/usr/local/bin/s3-scalpel %u
 Terminal=false
 Type=Application
 Icon=s3-scalpel
-Categories=Utility;
+Categories=Utility;Development;
 StartupWMClass=s3-scalpel
-
- 

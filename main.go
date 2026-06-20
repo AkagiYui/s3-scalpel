@@ -2,83 +2,96 @@ package main
 
 import (
 	"embed"
-	_ "embed"
 	"log"
-	"time"
+	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
-
-// Wails uses Go's `embed` package to embed the frontend files into the binary.
-// Any files in the frontend/dist folder will be embedded into the binary and
-// made available to the frontend.
-// See https://pkg.go.dev/embed for more information.
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
-func init() {
-	// Register a custom event whose associated data type is string.
-	// This is not required, but the binding generator will pick up registered events
-	// and provide a strongly typed JS/TS API for them.
-	application.RegisterEvent[string]("time")
-}
+// Version metadata. buildVersion can be overridden at link time with
+// -ldflags "-X main.buildVersion=<sha>".
+var (
+	version      = "0.1.0"
+	buildVersion = "dev"
+)
 
-// main function serves as the application's entry point. It initializes the application, creates a window,
-// and starts a goroutine that emits a time-based event every second. It subsequently runs the application and
-// logs any error that might occur.
+const appName = "S3 Scalpel"
+
 func main() {
+	dataDir, cacheDir := appDirs()
 
-	// Create a new Wails application by providing the necessary options.
-	// Variables 'Name' and 'Description' are for application metadata.
-	// 'Assets' configures the asset server with the 'FS' variable pointing to the frontend files.
-	// 'Bind' is a list of Go struct instances. The frontend has access to the methods of these instances.
-	// 'Mac' options tailor the application when running an macOS.
+	core, err := NewCore(dataDir, cacheDir, version, buildVersion, buildDebug)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	services := []application.Service{
+		application.NewService(&SettingsService{core: core}),
+		application.NewService(&ConfigService{core: core}),
+		application.NewService(&S3Service{core: core}),
+		application.NewService(&QueueService{core: core}),
+		application.NewService(&PreviewService{core: core}),
+		application.NewService(&AppService{core: core}),
+	}
+
+	// The macOS notifications service requires a valid app bundle to start. Only
+	// register it when running bundled, so the bare-binary dev workflow doesn't
+	// abort at startup.
+	var notif *notifications.NotificationService
+	if core.NotifyOK() {
+		notif = notifications.New()
+		services = append(services, application.NewService(notif))
+	}
+
 	app := application.New(application.Options{
-		Name:        "s3-scalpel",
-		Description: "A demo of using raw HTML & CSS",
-		Services: []application.Service{
-			application.NewService(&GreetService{}),
-		},
+		Name:        appName,
+		Description: "A surgical S3-compatible object storage client",
+		Services:    services,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-	})
-
-	// Create a new window with the necessary options.
-	// 'Title' is the title of the window.
-	// 'Mac' options tailor the window when running on macOS.
-	// 'BackgroundColour' is the background colour of the window.
-	// 'URL' is the URL that will be loaded into the webview.
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Window 1",
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
+		OnShutdown: func() {
+			core.queue.Flush()
 		},
-		BackgroundColour: application.NewRGB(27, 38, 54),
-		URL:              "/",
 	})
 
-	// Create a goroutine that emits an event containing the current time every second.
-	// The frontend can listen to this event and update the UI accordingly.
-	go func() {
-		for {
-			now := time.Now().Format(time.RFC1123)
-			app.Event.Emit("time", now)
-			time.Sleep(time.Second)
-		}
-	}()
+	core.SetApp(app, notif)
+	app.Menu.SetApplicationMenu(buildMenu(app, core))
 
-	// Run the application. This blocks until the application has been exited.
-	err := app.Run()
+	// Request notification permission when the service is active.
+	if notif != nil {
+		go func() {
+			_, _ = notif.RequestNotificationAuthorization()
+		}()
+	}
 
-	// If an error occurred while running the application, log it and exit.
-	if err != nil {
+	// First window.
+	core.createWindow(nextWindowName())
+
+	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// appDirs resolves platform-standard data and cache directories for the app.
+func appDirs() (dataDir, cacheDir string) {
+	cfgBase, err := os.UserConfigDir()
+	if err != nil || cfgBase == "" {
+		cfgBase, _ = os.MkdirTemp("", "s3scalpel-cfg")
+	}
+	cacheBase, err := os.UserCacheDir()
+	if err != nil || cacheBase == "" {
+		cacheBase = cfgBase
+	}
+	dataDir = filepath.Join(cfgBase, "S3Scalpel")
+	cacheDir = filepath.Join(cacheBase, "S3Scalpel")
+	return dataDir, cacheDir
 }
