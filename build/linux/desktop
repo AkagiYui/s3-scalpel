@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=My Product
+Comment=A s3-scalpel application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/s3-scalpel %u
+Terminal=false
+Type=Application
+Icon=s3-scalpel
+Categories=Utility;
+StartupWMClass=s3-scalpel
+
+ 
