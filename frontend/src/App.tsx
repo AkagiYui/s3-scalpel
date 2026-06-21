@@ -1,6 +1,7 @@
 import { onMount, onCleanup, type Component } from "solid-js";
 import { useNavigate, type RouteSectionProps } from "@solidjs/router";
 import { Sidebar } from "~/components/Sidebar";
+import { TitleBar } from "~/components/TitleBar";
 import { Toaster } from "~/components/ui/toast";
 import { loadSettings } from "~/stores/settings";
 import { loadConnections } from "~/stores/connections";
@@ -58,9 +59,12 @@ export const App: Component<RouteSectionProps> = (props) => {
   });
 
   return (
-    <div class="flex h-full w-full overflow-hidden bg-background text-foreground">
-      <Sidebar />
-      <main class="flex min-w-0 flex-1 flex-col overflow-hidden">{props.children}</main>
+    <div class="flex h-full w-full flex-col overflow-hidden bg-background text-foreground">
+      <TitleBar />
+      <div class="flex min-h-0 flex-1 overflow-hidden">
+        <Sidebar />
+        <main class="flex min-w-0 flex-1 flex-col overflow-hidden">{props.children}</main>
+      </div>
       <Toaster />
     </div>
   );

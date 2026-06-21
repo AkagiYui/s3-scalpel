@@ -142,3 +142,28 @@
   @apply bg-muted-foreground;
   background-clip: content-box;
 }
+
+/* Windows/Linux custom window controls in the frontend title bar. */
+:root {
+  --titlebar-height: 40px;
+}
+.winctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: var(--titlebar-height);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  transition: background-color 0.15s, color 0.15s;
+}
+.winctrl-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.winctrl-close:hover {
+  background: #e81123;
+  color: #ffffff;
+}

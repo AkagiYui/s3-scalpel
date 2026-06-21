@@ -49,6 +49,12 @@ export const en = {
     settings: "Settings",
     newWindow: "New Window",
   },
+  window: {
+    minimize: "Minimize",
+    maximize: "Maximize",
+    restore: "Restore",
+    close: "Close",
+  },
   connections: {
     title: "Connection Manager",
     subtitle: "Manage your S3-compatible storage accounts",

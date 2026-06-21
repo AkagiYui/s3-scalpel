@@ -1,6 +1,6 @@
 import { type Component, type JSX } from "solid-js";
 import { A } from "@solidjs/router";
-import { Database, HardDrive, Settings as SettingsIcon, Scissors } from "lucide-solid";
+import { Database, HardDrive, Settings as SettingsIcon } from "lucide-solid";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 
@@ -24,13 +24,7 @@ const NavItem: Component<{ href: string; icon: JSX.Element; label: string; end?:
 export const Sidebar: Component = () => {
   return (
     <aside class="flex w-56 shrink-0 flex-col border-r bg-card">
-      {/* Title region doubles as the draggable inset title bar on macOS. */}
-      <div class="drag flex h-14 items-center gap-2 px-4">
-        <Scissors class="h-5 w-5 text-primary" />
-        <span class="font-semibold tracking-tight">{t("app.name")}</span>
-      </div>
-
-      <nav class="flex flex-1 flex-col gap-1 p-2">
+      <nav class="flex flex-1 flex-col gap-1 p-2 pt-3">
         <NavItem
           href="/"
           end

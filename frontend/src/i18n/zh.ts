@@ -51,6 +51,12 @@ export const zh: Dict = {
     settings: "设置",
     newWindow: "新建窗口",
   },
+  window: {
+    minimize: "最小化",
+    maximize: "最大化",
+    restore: "还原",
+    close: "关闭",
+  },
   connections: {
     title: "配置管理",
     subtitle: "管理你的 S3 兼容存储账号",

@@ -2,12 +2,17 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"sync/atomic"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
+
+// titleBarHeight is the height (px) of the frontend-drawn title bar; it matches
+// the macOS invisible inset region so the whole visible bar is draggable.
+const titleBarHeight = 40
 
 var windowCounter atomic.Int64
 
@@ -26,8 +31,12 @@ func (c *Core) NewWindow() string {
 	return name
 }
 
-// createWindow builds a window with the standard chrome and options.
+// createWindow builds a window with the standard chrome and options. The title
+// bar is drawn by the frontend: on macOS the native inset traffic lights are
+// kept (non-frameless) with a reserved gap; on Windows/Linux the window is
+// frameless and the frontend renders its own min/max/close controls.
 func (c *Core) createWindow(name string) *application.WebviewWindow {
+	frameless := runtime.GOOS != "darwin"
 	w := c.app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:             name,
 		Title:            "S3 Scalpel",
@@ -38,11 +47,15 @@ func (c *Core) createWindow(name string) *application.WebviewWindow {
 		URL:              "/?wid=" + name,
 		EnableFileDrop:   true,
 		DevToolsEnabled:  c.debug,
+		Frameless:        frameless,
 		BackgroundColour: application.NewRGB(255, 255, 255),
 		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 0,
+			InvisibleTitleBarHeight: titleBarHeight,
 			Backdrop:                application.MacBackdropNormal,
 			TitleBar:                application.MacTitleBarHiddenInset,
+		},
+		Windows: application.WindowsWindow{
+			DisableFramelessWindowDecorations: false,
 		},
 	})
 
