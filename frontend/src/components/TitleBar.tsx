@@ -14,7 +14,7 @@ export const TitleBar: Component = () => {
   const [maximised, setMaximised] = createSignal(false);
 
   onMount(() => {
-    if (!isMac) Window.IsMaximised().then(setMaximised).catch(() => {});
+    if (!isMac()) Window.IsMaximised().then(setMaximised).catch(() => {});
   });
 
   const toggleMax = async () => {
@@ -30,16 +30,16 @@ export const TitleBar: Component = () => {
     <div
       class="drag flex h-10 shrink-0 select-none items-center border-b bg-card text-sm"
       onDblClick={() => {
-        if (!isMac) toggleMax();
+        if (!isMac()) toggleMax();
       }}
     >
       {/* Reserve space for the macOS traffic lights (hidden in fullscreen). */}
-      <Show when={isMac && !fullscreen()}>
+      <Show when={isMac() && !fullscreen()}>
         <div class="h-full w-[78px] shrink-0" />
       </Show>
 
       {/* App identity */}
-      <div class="flex items-center gap-2 px-3" classList={{ "pl-2": isMac }}>
+      <div class="flex items-center gap-2 px-3" classList={{ "pl-2": isMac() }}>
         <Scissors class="h-4 w-4 text-primary" />
         <span class="font-semibold tracking-tight">{t("app.name")}</span>
       </div>
@@ -48,7 +48,7 @@ export const TitleBar: Component = () => {
       <div class="h-full flex-1" />
 
       {/* Windows / Linux window controls */}
-      <Show when={!isMac}>
+      <Show when={!isMac()}>
         <div class="no-drag flex h-full items-center">
           <button class="winctrl-btn" title={t("window.minimize")} onClick={() => Window.Minimise()}>
             <Minus class="h-4 w-4" />

@@ -1,5 +1,6 @@
-import { Events, System, Window } from "@wailsio/runtime";
+import { Events, Window } from "@wailsio/runtime";
 import { createSignal, onCleanup, onMount, type Accessor } from "solid-js";
+import { isMac } from "~/lib/platform";
 
 const [isFullscreen, setIsFullscreen] = createSignal(false);
 let initialized = false;
@@ -18,7 +19,7 @@ export function useFullscreen(): Accessor<boolean> {
       /* no bridge (preview) */
     }
 
-    if (System.IsMac()) {
+    if (isMac()) {
       const offEnter = Events.On("mac:WindowDidEnterFullScreen", () => setIsFullscreen(true));
       const offExit = Events.On("mac:WindowDidExitFullScreen", () => setIsFullscreen(false));
       onCleanup(() => {

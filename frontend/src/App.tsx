@@ -7,6 +7,7 @@ import { loadSettings } from "~/stores/settings";
 import { loadConnections } from "~/stores/connections";
 import { initQueue } from "~/stores/tasks";
 import { windowID, onEvent } from "~/lib/api";
+import { refreshPlatform } from "~/lib/platform";
 import * as bus from "~/lib/bus";
 
 export const App: Component<RouteSectionProps> = (props) => {
@@ -14,6 +15,7 @@ export const App: Component<RouteSectionProps> = (props) => {
   const wid = windowID();
 
   onMount(() => {
+    refreshPlatform();
     loadSettings();
     loadConnections();
     initQueue();
