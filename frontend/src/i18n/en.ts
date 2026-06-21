@@ -258,6 +258,27 @@ export const en = {
     loading: "Preparing preview…",
     openExternal: "Open in browser",
   },
+  capabilities: {
+    title: "Access Key Capabilities",
+    subtitle:
+      "S3 endpoints expose no API to query permissions, so they are probed by trying each operation.",
+    accountScope: "Account-level only — open a bucket to probe object operations.",
+    note: "Write probes create a tiny temporary object and immediately delete it.",
+    recheck: "Re-check",
+    checking: "Probing…",
+    allowed: "Allowed",
+    denied: "Denied",
+    untested: "Not tested",
+    ops: {
+      listBuckets: "List buckets",
+      listObjects: "List objects",
+      bucketVersioning: "Read versioning config",
+      putObject: "Upload object",
+      getObject: "Read object",
+      objectTagging: "Object tagging",
+      deleteObject: "Delete object",
+    },
+  },
   errors: {
     generic: "Something went wrong.",
     loadConnections: "Failed to load connections.",

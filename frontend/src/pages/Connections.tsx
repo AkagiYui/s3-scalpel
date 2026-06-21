@@ -1,11 +1,12 @@
 import { createSignal, For, Show, onMount, onCleanup, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Plus, Pencil, Trash2, Database, ExternalLink, Globe } from "lucide-solid";
+import { Plus, Pencil, Trash2, Database, ExternalLink, Globe, ShieldCheck } from "lucide-solid";
 import { PageHeader } from "~/components/PageHeader";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/primitives";
 import { Badge } from "~/components/ui/primitives";
 import { ConnectionForm } from "~/features/connections/ConnectionForm";
+import { CapabilitiesDialog } from "~/features/storage/CapabilitiesDialog";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { connections, deleteConnection } from "~/stores/connections";
 import { openTab } from "~/stores/tabs";
@@ -21,6 +22,7 @@ const Connections: Component = () => {
   const [formOpen, setFormOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Connection | null>(null);
   const [confirmDel, setConfirmDel] = createSignal<Connection | null>(null);
+  const [capsConn, setCapsConn] = createSignal<Connection | null>(null);
 
   const add = () => {
     setEditing(null);
@@ -107,6 +109,14 @@ const Connections: Component = () => {
                       <ExternalLink class="h-3.5 w-3.5" />
                       {t("connections.open")}
                     </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="outline"
+                      onClick={() => setCapsConn(c)}
+                      title={t("capabilities.title")}
+                    >
+                      <ShieldCheck class="h-3.5 w-3.5" />
+                    </Button>
                     <Button size="icon-sm" variant="outline" onClick={() => edit(c)}>
                       <Pencil class="h-3.5 w-3.5" />
                     </Button>
@@ -127,6 +137,14 @@ const Connections: Component = () => {
       </div>
 
       <ConnectionForm open={formOpen()} onOpenChange={setFormOpen} edit={editing()} />
+      <Show when={capsConn()}>
+        <CapabilitiesDialog
+          open
+          onOpenChange={(o) => !o && setCapsConn(null)}
+          connId={capsConn()!.id}
+          bucket=""
+        />
+      </Show>
       <ConfirmDialog
         open={!!confirmDel()}
         onOpenChange={(o) => !o && setConfirmDel(null)}

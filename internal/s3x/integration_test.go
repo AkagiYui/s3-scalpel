@@ -46,23 +46,27 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("client: %v", err)
 	}
 
+	// ListBuckets may be denied on accounts whose keys are scoped to specific
+	// buckets; that is not fatal to object-level testing.
 	buckets, err := ListBuckets(ctx, cl)
 	if err != nil {
-		t.Fatalf("ListBuckets: %v", err)
+		t.Logf("ListBuckets denied/failed (continuing): %v", err)
+	} else {
+		t.Logf("found %d buckets", len(buckets))
 	}
-	t.Logf("found %d buckets", len(buckets))
 
 	bucket := os.Getenv("S3SCALPEL_TEST_BUCKET")
-	if bucket == "" {
-		if len(buckets) > 0 {
-			bucket = buckets[0].Name
-		} else {
-			bucket = fmt.Sprintf("s3scalpel-it-%d", time.Now().Unix())
-			if err := CreateBucket(ctx, cl, bucket, conn.Region); err != nil {
-				t.Fatalf("CreateBucket %s: %v", bucket, err)
-			}
-			t.Logf("created bucket %s", bucket)
+	switch {
+	case bucket != "":
+		// use the provided bucket
+	case len(buckets) > 0:
+		bucket = buckets[0].Name
+	default:
+		bucket = fmt.Sprintf("s3scalpel-it-%d", time.Now().Unix())
+		if err := CreateBucket(ctx, cl, bucket, conn.Region); err != nil {
+			t.Fatalf("no bucket available and CreateBucket %s failed: %v (set S3SCALPEL_TEST_BUCKET to an existing bucket)", bucket, err)
 		}
+		t.Logf("created bucket %s", bucket)
 	}
 	t.Logf("using bucket %s", bucket)
 
@@ -170,6 +174,11 @@ func TestIntegration(t *testing.T) {
 	gotBig, _ := os.ReadFile(bigDst)
 	if !bytes.Equal(gotBig, big) {
 		t.Errorf("multipart download mismatch (len got=%d want=%d)", len(gotBig), len(big))
+	}
+
+	// Capability probe (logged, non-fatal) against the live bucket.
+	for _, c := range CheckCapabilities(ctx, cl, bucket) {
+		t.Logf("capability %-18s tested=%v allowed=%v %s", c.Op, c.Tested, c.Allowed, c.Detail)
 	}
 
 	// Clean up the test objects (leave any pre-existing bucket intact).

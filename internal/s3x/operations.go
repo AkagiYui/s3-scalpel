@@ -3,10 +3,10 @@ package s3x
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -286,35 +286,50 @@ func DeleteObject(ctx context.Context, cl *s3.Client, bucket, key, versionID str
 }
 
 // DeletePrefix removes every object under a prefix (used to delete a folder).
+//
+// It deletes objects individually with bounded concurrency rather than via the
+// batch DeleteObjects API: that API requires a Content-MD5 header which several
+// S3-compatible gateways enforce but the SDK omits once default checksums are
+// disabled (needed for broad upload compatibility). Single DeleteObject calls
+// are portable everywhere.
 func DeletePrefix(ctx context.Context, cl *s3.Client, bucket, prefix string) error {
 	entries, err := ListAllObjects(ctx, cl, bucket, prefix)
 	if err != nil {
 		return err
 	}
-	ids := make([]types.ObjectIdentifier, 0, len(entries))
-	for _, e := range entries {
-		ids = append(ids, types.ObjectIdentifier{Key: aws.String(e.Key)})
-	}
-	if len(ids) == 0 {
+	if len(entries) == 0 {
+		// Empty folder: remove just the placeholder object.
 		return DeleteObject(ctx, cl, bucket, prefix, "")
 	}
-	for start := 0; start < len(ids); start += 1000 {
-		end := start + 1000
-		if end > len(ids) {
-			end = len(ids)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+
+	for _, e := range entries {
+		if ctx.Err() != nil {
+			break
 		}
-		out, err := cl.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: aws.String(bucket),
-			Delete: &types.Delete{Objects: ids[start:end], Quiet: aws.Bool(true)},
-		})
-		if err != nil {
-			return err
-		}
-		if len(out.Errors) > 0 {
-			return fmt.Errorf("failed to delete %s: %s", aws.ToString(out.Errors[0].Key), aws.ToString(out.Errors[0].Message))
-		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(key string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if err := DeleteObject(ctx, cl, bucket, key, ""); err != nil && ctx.Err() == nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+					cancel()
+				}
+				mu.Unlock()
+			}
+		}(e.Key)
 	}
-	return nil
+	wg.Wait()
+	return firstErr
 }
 
 // CopyObject copies within or across buckets. CopySource must be URL-escaped.

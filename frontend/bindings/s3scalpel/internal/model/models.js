@@ -149,6 +149,64 @@ export class BucketInfo {
 }
 
 /**
+ * Capability is the result of probing a single S3 operation to discover whether
+ * the credentials are permitted to perform it. S3 endpoints expose no API to
+ * query permissions, so they are determined empirically.
+ */
+export class Capability {
+    /**
+     * Creates a new Capability instance.
+     * @param {Partial<Capability>} [$$source = {}] - The source object to create the Capability.
+     */
+    constructor($$source = {}) {
+        if (!("op" in $$source)) {
+            /**
+             * stable operation id, e.g. "putObject"
+             * @member
+             * @type {string}
+             */
+            this["op"] = "";
+        }
+        if (!("allowed" in $$source)) {
+            /**
+             * whether the probe succeeded
+             * @member
+             * @type {boolean}
+             */
+            this["allowed"] = false;
+        }
+        if (!("tested" in $$source)) {
+            /**
+             * whether the probe ran (bucket ops need a bucket)
+             * @member
+             * @type {boolean}
+             */
+            this["tested"] = false;
+        }
+        if (!("detail" in $$source)) {
+            /**
+             * short explanation on failure
+             * @member
+             * @type {string}
+             */
+            this["detail"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Capability instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Capability}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Capability(/** @type {Partial<Capability>} */($$parsedSource));
+    }
+}
+
+/**
  * Connection is a single S3-compatible account configuration. It deliberately
  * does NOT include a bucket name: buckets are listed after connecting.
  */

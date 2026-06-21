@@ -151,3 +151,15 @@ func (s *S3Service) CreateFolder(connID, bucket, prefix, name string) error {
 	key := s3x.JoinKey(prefix, name) + "/"
 	return s3x.CreateFolder(ctx, cl, bucket, key)
 }
+
+// CheckCapabilities probes which operations the connection's credentials are
+// permitted to perform. Pass an empty bucket for account-level probes only.
+func (s *S3Service) CheckCapabilities(connID, bucket string) ([]model.Capability, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return nil, err
+	}
+	return s3x.CheckCapabilities(ctx, cl, bucket), nil
+}

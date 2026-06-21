@@ -20,6 +20,7 @@ import {
   ArrowUpDown,
   Search,
   ChevronLeft,
+  ShieldCheck,
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
@@ -34,6 +35,7 @@ import { PresignDialog } from "./PresignDialog";
 import { TagsDialog } from "./TagsDialog";
 import { VersionsDialog } from "./VersionsDialog";
 import { PreviewDialog } from "./PreviewDialog";
+import { CapabilitiesDialog } from "./CapabilitiesDialog";
 import { S3Service, QueueService, AppService, windowID, onEvent, type ObjectEntry, type BucketInfo } from "~/lib/api";
 import { navigatePrefix, openBucket, type Tab } from "~/stores/tabs";
 import { filterEntries, sortEntries, breadcrumbSegments, normalizePrefix, type SortKey, type SortDir } from "./objects";
@@ -68,6 +70,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [downloadKeys, setDownloadKeys] = createSignal<string[] | null>(null);
   const [copyMove, setCopyMove] = createSignal<{ keys: string[]; move: boolean } | null>(null);
   const [deleteKeys, setDeleteKeys] = createSignal<string[] | null>(null);
+  const [capsOpen, setCapsOpen] = createSignal(false);
 
   const bucket = () => props.tab.bucket!;
   const prefix = () => props.tab.prefix;
@@ -344,6 +347,9 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
           <Button size="icon-sm" variant="outline" onClick={() => load(true)} title={t("storage.refreshList")}>
             <RefreshCw class={cn("h-3.5 w-3.5", loading() && "animate-spin")} />
           </Button>
+          <Button size="icon-sm" variant="outline" onClick={() => setCapsOpen(true)} title={t("capabilities.title")}>
+            <ShieldCheck class="h-3.5 w-3.5" />
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setNewFolderOpen(true)}>
             <FolderPlus class="h-3.5 w-3.5" />
             {t("storage.newFolder")}
@@ -512,6 +518,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       <Show when={versionsKey()}>
         <VersionsDialog open onOpenChange={(o) => !o && setVersionsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={versionsKey()!} />
       </Show>
+      <CapabilitiesDialog open={capsOpen()} onOpenChange={setCapsOpen} connId={props.tab.connectionId} bucket={bucket()} />
     </div>
   );
 };

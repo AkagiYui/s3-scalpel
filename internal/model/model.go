@@ -160,3 +160,13 @@ type TestResult struct {
 	Message     string `json:"message"`
 	BucketCount int    `json:"bucketCount"`
 }
+
+// Capability is the result of probing a single S3 operation to discover whether
+// the credentials are permitted to perform it. S3 endpoints expose no API to
+// query permissions, so they are determined empirically.
+type Capability struct {
+	Op      string `json:"op"`      // stable operation id, e.g. "putObject"
+	Allowed bool   `json:"allowed"` // whether the probe succeeded
+	Tested  bool   `json:"tested"`  // whether the probe ran (bucket ops need a bucket)
+	Detail  string `json:"detail"`  // short explanation on failure
+}

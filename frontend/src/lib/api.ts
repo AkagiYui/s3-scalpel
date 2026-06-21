@@ -24,6 +24,7 @@ import {
   Task,
   PreviewData,
   TestResult,
+  Capability,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -38,6 +39,7 @@ export {
   Task,
   PreviewData,
   TestResult,
+  Capability,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */

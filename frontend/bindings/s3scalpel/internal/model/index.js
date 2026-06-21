@@ -5,6 +5,7 @@
 export {
     AppSettings,
     BucketInfo,
+    Capability,
     Connection,
     ListResult,
     ObjectEntry,

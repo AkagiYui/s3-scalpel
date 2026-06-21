@@ -17,6 +17,19 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as model$0 from "./internal/model/models.js";
 
 /**
+ * CheckCapabilities probes which operations the connection's credentials are
+ * permitted to perform. Pass an empty bucket for account-level probes only.
+ * @param {string} connID
+ * @param {string} bucket
+ * @returns {$CancellablePromise<model$0.Capability[]>}
+ */
+export function CheckCapabilities(connID, bucket) {
+    return $Call.ByID(2859085307, connID, bucket).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * CreateBucket creates a new bucket.
  * @param {string} connID
  * @param {string} name
@@ -57,7 +70,7 @@ export function DeleteBucket(connID, name) {
  */
 export function GetTags(connID, bucket, key) {
     return $Call.ByID(2610821468, connID, bucket, key).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -70,7 +83,7 @@ export function GetTags(connID, bucket, key) {
  */
 export function ListAll(connID, bucket, prefix) {
     return $Call.ByID(560236730, connID, bucket, prefix).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType5($result);
     }));
 }
 
@@ -81,7 +94,7 @@ export function ListAll(connID, bucket, prefix) {
  */
 export function ListBuckets(connID) {
     return $Call.ByID(1318176394, connID).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
     }));
 }
 
@@ -95,7 +108,7 @@ export function ListBuckets(connID) {
  */
 export function ListObjects(connID, bucket, prefix, token) {
     return $Call.ByID(4121172557, connID, bucket, prefix, token).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType8($result);
     }));
 }
 
@@ -108,7 +121,7 @@ export function ListObjects(connID, bucket, prefix, token) {
  */
 export function ListVersions(connID, bucket, key) {
     return $Call.ByID(3392385798, connID, bucket, key).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -135,7 +148,7 @@ export function PresignGet(connID, bucket, key, versionID, expirySeconds) {
  */
 export function Properties(connID, bucket, key, versionID) {
     return $Call.ByID(2156449790, connID, bucket, key, versionID).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }));
 }
 
@@ -162,13 +175,15 @@ export function VersioningEnabled(connID, bucket) {
 }
 
 // Private type creation functions
-const $$createType0 = model$0.Tag.createFrom;
+const $$createType0 = model$0.Capability.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = model$0.ObjectEntry.createFrom;
+const $$createType2 = model$0.Tag.createFrom;
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = model$0.BucketInfo.createFrom;
+const $$createType4 = model$0.ObjectEntry.createFrom;
 const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = model$0.ListResult.createFrom;
-const $$createType7 = model$0.ObjectVersion.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = model$0.ObjectProperties.createFrom;
+const $$createType6 = model$0.BucketInfo.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = model$0.ListResult.createFrom;
+const $$createType9 = model$0.ObjectVersion.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = model$0.ObjectProperties.createFrom;
