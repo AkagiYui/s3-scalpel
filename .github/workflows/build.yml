@@ -1,62 +1,111 @@
 name: Build
 
 on:
+  workflow_dispatch:
   push:
-    branches: [master]
+    branches:
+      - master
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  # 检查 commits，决定是否需要构建
+  check-commits:
+    name: 检查 commits
+    runs-on: ubuntu-latest
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 检出代码
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.74
-
-      - name: Build frontend
-        run: |
-          cd frontend
-          pnpm install --frozen-lockfile
-          pnpm run build
-
-      - name: Build (macOS)
-        if: runner.os == 'macOS'
+      - name: 检查是否需要构建
+        id: check
         env:
-          CGO_ENABLED: 1
-          CGO_CFLAGS: "-mmacosx-version-min=10.15"
-          CGO_LDFLAGS: "-mmacosx-version-min=10.15"
-          MACOSX_DEPLOYMENT_TARGET: "10.15"
-        run: |
-          go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/s3-scalpel
+          COMMITS_JSON: ${{ toJson(github.event.commits) }}
+        run: python3 scripts/check_build.py
 
-      - name: Build (Windows)
+  build:
+    needs: check-commits
+    # 只要有任意一个功能性 commit 就触发构建
+    if: needs.check-commits.outputs.should-build == 'true'
+    # 构建任务
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+            artifact: s3-scalpel-macos-arm64
+          - os: windows-latest
+            arch: x64
+            artifact: s3-scalpel-windows-x64
+
+    name: 构建 ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    # 使用 bash 作为默认 shell（Windows 会使用 Git Bash）
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 安装 Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: 'go.mod'
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: 'frontend/package.json'
+          cache: true
+          cache_dependency_path: 'frontend/pnpm-lock.yaml'
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'frontend/package.json'
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      - name: 安装 NSIS (Windows)
         if: runner.os == 'Windows'
-        env:
-          GOOS: windows
-          CGO_ENABLED: 0
-          GOARCH: amd64
-        run: |
-          wails3 generate syso -arch amd64 -icon build/windows/icon.ico -manifest build/windows/wails.exe.manifest -info build/windows/info.json -out wails_windows_amd64.syso
-          go build -tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui" -o bin/s3-scalpel.exe
-
-      - uses: actions/upload-artifact@v4
+        uses: AkagiYui/install-nsis@v1.1.2
         with:
-          name: s3-scalpel-${{ matrix.os }}
+          nsis-version: '3.12'
+
+      - name: 安装 Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: 更新构建资源
+        run: wails3 task common:update:build-assets
+
+      - name: 构建应用
+        run: wails3 package
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
           path: bin/
+
+  # 生成构建摘要
+  summary:
+    needs: [build, check-commits]
+    # 无论构建是否成功都生成摘要
+    if: always() && needs.check-commits.outputs.should-build == 'true'
+    name: 生成构建摘要
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 生成 Action Summary
+        env:
+          COMMITS_JSON: ${{ toJson(github.event.commits) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/generate_summary.py
