@@ -1,8 +1,9 @@
 import { createResource, createSignal, For, Show, type Component } from "solid-js";
-import { Plus, RefreshCw, Trash2, FolderOpen, Database, Box } from "lucide-solid";
+import { Plus, RefreshCw, Trash2, FolderOpen, Database, Box, Settings2 } from "lucide-solid";
 import { Button } from "~/components/ui/button";
 import { Card, Spinner } from "~/components/ui/primitives";
 import { PromptDialog } from "./PromptDialog";
+import { BucketSettingsDialog } from "./BucketSettingsDialog";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { S3Service, type BucketInfo } from "~/lib/api";
 import { formatDate } from "~/lib/utils";
@@ -28,6 +29,7 @@ export const BucketList: Component<{
 
   const [createOpen, setCreateOpen] = createSignal(false);
   const [delTarget, setDelTarget] = createSignal<string | null>(null);
+  const [settingsBucket, setSettingsBucket] = createSignal<string | null>(null);
 
   const create = async (name: string) => {
     try {
@@ -103,6 +105,9 @@ export const BucketList: Component<{
                     <Button size="icon-sm" variant="ghost" onClick={() => props.onOpen(b.name)}>
                       <FolderOpen class="h-4 w-4" />
                     </Button>
+                    <Button size="icon-sm" variant="ghost" onClick={() => setSettingsBucket(b.name)}>
+                      <Settings2 class="h-4 w-4" />
+                    </Button>
                     <Button
                       size="icon-sm"
                       variant="ghost"
@@ -135,6 +140,14 @@ export const BucketList: Component<{
         destructive
         onConfirm={doDelete}
       />
+      <Show when={settingsBucket()}>
+        <BucketSettingsDialog
+          open={!!settingsBucket()}
+          onOpenChange={(o) => !o && setSettingsBucket(null)}
+          connId={props.connId}
+          bucket={settingsBucket()!}
+        />
+      </Show>
     </div>
   );
 };

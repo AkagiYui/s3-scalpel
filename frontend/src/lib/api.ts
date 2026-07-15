@@ -5,6 +5,7 @@ export {
   AppService,
   ConfigService,
   S3Service,
+  BucketService,
   QueueService,
   SettingsService,
   PreviewService,
@@ -25,6 +26,11 @@ import {
   PreviewData,
   TestResult,
   Capability,
+  BucketVersioning,
+  CORSRule,
+  LifecycleRule,
+  BucketEncryption,
+  PublicAccessBlock,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -40,6 +46,11 @@ export {
   PreviewData,
   TestResult,
   Capability,
+  BucketVersioning,
+  CORSRule,
+  LifecycleRule,
+  BucketEncryption,
+  PublicAccessBlock,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */

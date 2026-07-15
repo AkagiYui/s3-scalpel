@@ -111,6 +111,59 @@ export class AppSettings {
 }
 
 /**
+ * BucketEncryption describes the bucket's default server-side encryption.
+ */
+export class BucketEncryption {
+    /**
+     * Creates a new BucketEncryption instance.
+     * @param {Partial<BucketEncryption>} [$$source = {}] - The source object to create the BucketEncryption.
+     */
+    constructor($$source = {}) {
+        if (!("enabled" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["enabled"] = false;
+        }
+        if (!("sseAlgorithm" in $$source)) {
+            /**
+             * "AES256" | "aws:kms"
+             * @member
+             * @type {string}
+             */
+            this["sseAlgorithm"] = "";
+        }
+        if (!("kmsKeyId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["kmsKeyId"] = "";
+        }
+        if (!("bucketKeyEnabled" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["bucketKeyEnabled"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BucketEncryption instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {BucketEncryption}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new BucketEncryption(/** @type {Partial<BucketEncryption>} */($$parsedSource));
+    }
+}
+
+/**
  * BucketInfo describes a bucket in a connection.
  */
 export class BucketInfo {
@@ -145,6 +198,127 @@ export class BucketInfo {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new BucketInfo(/** @type {Partial<BucketInfo>} */($$parsedSource));
+    }
+}
+
+/**
+ * BucketVersioning is a bucket's versioning state. Status is "Enabled",
+ * "Suspended", or "" when versioning was never configured.
+ */
+export class BucketVersioning {
+    /**
+     * Creates a new BucketVersioning instance.
+     * @param {Partial<BucketVersioning>} [$$source = {}] - The source object to create the BucketVersioning.
+     */
+    constructor($$source = {}) {
+        if (!("status" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["status"] = "";
+        }
+        if (!("mfaDelete" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["mfaDelete"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BucketVersioning instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {BucketVersioning}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new BucketVersioning(/** @type {Partial<BucketVersioning>} */($$parsedSource));
+    }
+}
+
+/**
+ * CORSRule is one cross-origin resource sharing rule.
+ */
+export class CORSRule {
+    /**
+     * Creates a new CORSRule instance.
+     * @param {Partial<CORSRule>} [$$source = {}] - The source object to create the CORSRule.
+     */
+    constructor($$source = {}) {
+        if (!("id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["id"] = "";
+        }
+        if (!("allowedOrigins" in $$source)) {
+            /**
+             * @member
+             * @type {string[]}
+             */
+            this["allowedOrigins"] = [];
+        }
+        if (!("allowedMethods" in $$source)) {
+            /**
+             * @member
+             * @type {string[]}
+             */
+            this["allowedMethods"] = [];
+        }
+        if (!("allowedHeaders" in $$source)) {
+            /**
+             * @member
+             * @type {string[]}
+             */
+            this["allowedHeaders"] = [];
+        }
+        if (!("exposeHeaders" in $$source)) {
+            /**
+             * @member
+             * @type {string[]}
+             */
+            this["exposeHeaders"] = [];
+        }
+        if (!("maxAgeSeconds" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["maxAgeSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CORSRule instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CORSRule}
+     */
+    static createFrom($$source = {}) {
+        const $$createField1_0 = $$createType0;
+        const $$createField2_0 = $$createType0;
+        const $$createField3_0 = $$createType0;
+        const $$createField4_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("allowedOrigins" in $$parsedSource) {
+            $$parsedSource["allowedOrigins"] = $$createField1_0($$parsedSource["allowedOrigins"]);
+        }
+        if ("allowedMethods" in $$parsedSource) {
+            $$parsedSource["allowedMethods"] = $$createField2_0($$parsedSource["allowedMethods"]);
+        }
+        if ("allowedHeaders" in $$parsedSource) {
+            $$parsedSource["allowedHeaders"] = $$createField3_0($$parsedSource["allowedHeaders"]);
+        }
+        if ("exposeHeaders" in $$parsedSource) {
+            $$parsedSource["exposeHeaders"] = $$createField4_0($$parsedSource["exposeHeaders"]);
+        }
+        return new CORSRule(/** @type {Partial<CORSRule>} */($$parsedSource));
     }
 }
 
@@ -292,6 +466,87 @@ export class Connection {
 }
 
 /**
+ * LifecycleRule is a simplified representation of an S3 lifecycle rule covering
+ * the fields a desktop client realistically edits.
+ */
+export class LifecycleRule {
+    /**
+     * Creates a new LifecycleRule instance.
+     * @param {Partial<LifecycleRule>} [$$source = {}] - The source object to create the LifecycleRule.
+     */
+    constructor($$source = {}) {
+        if (!("id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["id"] = "";
+        }
+        if (!("prefix" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["prefix"] = "";
+        }
+        if (!("enabled" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["enabled"] = false;
+        }
+        if (!("expirationDays" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expirationDays"] = 0;
+        }
+        if (!("noncurrentVersionExpirationDays" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["noncurrentVersionExpirationDays"] = 0;
+        }
+        if (!("abortIncompleteMultipartDays" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["abortIncompleteMultipartDays"] = 0;
+        }
+        if (!("transitionDays" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["transitionDays"] = 0;
+        }
+        if (!("transitionStorageClass" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["transitionStorageClass"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LifecycleRule instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {LifecycleRule}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LifecycleRule(/** @type {Partial<LifecycleRule>} */($$parsedSource));
+    }
+}
+
+/**
  * ListResult is a single page of a listing.
  */
 export class ListResult {
@@ -338,7 +593,7 @@ export class ListResult {
      * @returns {ListResult}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType1;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("entries" in $$parsedSource) {
             $$parsedSource["entries"] = $$createField1_0($$parsedSource["entries"]);
@@ -520,7 +775,7 @@ export class ObjectProperties {
      * @returns {ObjectProperties}
      */
     static createFrom($$source = {}) {
-        const $$createField10_0 = $$createType2;
+        const $$createField10_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("metadata" in $$parsedSource) {
             $$parsedSource["metadata"] = $$createField10_0($$parsedSource["metadata"]);
@@ -693,6 +948,66 @@ export const PreviewKind = {
     PreviewUnsupported: "unsupported",
     PreviewTooLarge: "too-large",
 };
+
+/**
+ * PublicAccessBlock mirrors the S3 public access block configuration. Configured
+ * is false when the bucket has no block configuration at all.
+ */
+export class PublicAccessBlock {
+    /**
+     * Creates a new PublicAccessBlock instance.
+     * @param {Partial<PublicAccessBlock>} [$$source = {}] - The source object to create the PublicAccessBlock.
+     */
+    constructor($$source = {}) {
+        if (!("configured" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["configured"] = false;
+        }
+        if (!("blockPublicAcls" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["blockPublicAcls"] = false;
+        }
+        if (!("ignorePublicAcls" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ignorePublicAcls"] = false;
+        }
+        if (!("blockPublicPolicy" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["blockPublicPolicy"] = false;
+        }
+        if (!("restrictPublicBuckets" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["restrictPublicBuckets"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PublicAccessBlock instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PublicAccessBlock}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PublicAccessBlock(/** @type {Partial<PublicAccessBlock>} */($$parsedSource));
+    }
+}
 
 /**
  * Tag is an object tag key/value pair.
@@ -963,6 +1278,7 @@ export class TestResult {
 }
 
 // Private type creation functions
-const $$createType0 = ObjectEntry.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $Create.Map($Create.Any, $Create.Any);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = ObjectEntry.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = $Create.Map($Create.Any, $Create.Any);

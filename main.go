@@ -34,6 +34,7 @@ func main() {
 		application.NewService(&SettingsService{core: core}),
 		application.NewService(&ConfigService{core: core}),
 		application.NewService(&S3Service{core: core}),
+		application.NewService(&BucketService{core: core}),
 		application.NewService(&QueueService{core: core}),
 		application.NewService(&PreviewService{core: core}),
 		application.NewService(&AppService{core: core}),
