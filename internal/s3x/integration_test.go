@@ -116,7 +116,7 @@ func TestIntegration(t *testing.T) {
 
 	// Download and verify content.
 	dst := filepath.Join(t.TempDir(), "hello-dl.txt")
-	if err := Download(ctx, cl, bucket, key, dst, nil); err != nil {
+	if err := Download(ctx, cl, bucket, key, dst, DownloadOptions{}, nil); err != nil {
 		t.Fatalf("Download: %v", err)
 	}
 	got, err := os.ReadFile(dst)
@@ -168,7 +168,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("multipart Upload: %v", err)
 	}
 	bigDst := filepath.Join(t.TempDir(), "big-dl.bin")
-	if err := Download(ctx, cl, bucket, bigKey, bigDst, nil); err != nil {
+	if err := Download(ctx, cl, bucket, bigKey, bigDst, DownloadOptions{Multipart: true, PartSize: MinPartSize, PartConcurrency: 3}, nil); err != nil {
 		t.Fatalf("multipart Download: %v", err)
 	}
 	gotBig, _ := os.ReadFile(bigDst)

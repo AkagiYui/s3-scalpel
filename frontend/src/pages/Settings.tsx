@@ -172,6 +172,19 @@ const Settings: Component = () => {
               />
             </Row>
             <Separator />
+            <Row label={t("settings.partConcurrency")} hint={t("settings.partConcurrencyHint")}>
+              <Input
+                type="number"
+                min={1}
+                max={16}
+                class="w-24"
+                value={settings().partConcurrency ?? 4}
+                onChange={(e) =>
+                  updateSettings({ partConcurrency: Math.max(1, Math.min(16, Number(e.currentTarget.value) || 4)) })
+                }
+              />
+            </Row>
+            <Separator />
             <Row label={t("settings.concurrency")}>
               <Input
                 type="number"

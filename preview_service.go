@@ -62,7 +62,7 @@ func (s *PreviewService) GetPreview(connID, bucket, key string) (model.PreviewDa
 	tmpDir := filepath.Join(s.core.cacheDir, "preview")
 	_ = os.MkdirAll(tmpDir, 0o755)
 	tmp := filepath.Join(tmpDir, randID()+filepath.Ext(key))
-	if err := s3x.Download(ctx, cl, bucket, key, tmp, nil); err != nil {
+	if err := s3x.Download(ctx, cl, bucket, key, tmp, s3x.DownloadOptions{}, nil); err != nil {
 		return out, err
 	}
 	defer os.Remove(tmp)

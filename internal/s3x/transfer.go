@@ -1,7 +1,6 @@
 package s3x
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"mime"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // ProgressFunc reports cumulative bytes transferred.
@@ -89,7 +87,7 @@ func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, m
 		_, err := cl.PutObject(ctx, in)
 		return err
 	}
-	return multipartUpload(ctx, cl, bucket, key, f, size, ct, partSize, opts, onProgress)
+	return multipartUploadParallel(ctx, cl, bucket, key, f, size, ct, partSize, opts, onProgress)
 }
 
 // progressReader wraps a reader to report cumulative bytes read.
@@ -110,82 +108,32 @@ func (p *progressReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func multipartUpload(ctx context.Context, cl *s3.Client, bucket, key string, f *os.File, size int64, ct string, partSize int64, opts UploadOptions, onProgress ProgressFunc) error {
-	createIn := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(key),
-		ContentType: aws.String(ct),
-	}
-	opts.applyCreateMultipart(createIn)
-	create, err := cl.CreateMultipartUpload(ctx, createIn)
-	if err != nil {
-		return err
-	}
-	uploadID := create.UploadId
-	abort := func() {
-		_, _ = cl.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
-			Bucket: aws.String(bucket), Key: aws.String(key), UploadId: uploadID,
-		})
-	}
-
-	var completed []types.CompletedPart
-	var partNum int32 = 1
-	var uploaded int64
-	buf := make([]byte, partSize)
-	for {
-		select {
-		case <-ctx.Done():
-			abort()
-			return ctx.Err()
-		default:
-		}
-		n, readErr := io.ReadFull(f, buf)
-		if n > 0 {
-			part, err := cl.UploadPart(ctx, &s3.UploadPartInput{
-				Bucket:        aws.String(bucket),
-				Key:           aws.String(key),
-				UploadId:      uploadID,
-				PartNumber:    aws.Int32(partNum),
-				Body:          bytes.NewReader(buf[:n]),
-				ContentLength: aws.Int64(int64(n)),
-			})
-			if err != nil {
-				abort()
-				return err
-			}
-			completed = append(completed, types.CompletedPart{ETag: part.ETag, PartNumber: aws.Int32(partNum)})
-			uploaded += int64(n)
-			if onProgress != nil {
-				onProgress(uploaded)
-			}
-			partNum++
-		}
-		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
-			break
-		}
-		if readErr != nil {
-			abort()
-			return readErr
-		}
-	}
-	_, err = cl.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket:          aws.String(bucket),
-		Key:             aws.String(key),
-		UploadId:        uploadID,
-		MultipartUpload: &types.CompletedMultipartUpload{Parts: completed},
-	})
-	if err != nil {
-		abort()
-		return err
-	}
-	return nil
+// DownloadOptions tunes how an object is fetched. When Multipart is set and the
+// object is large (>= MinParallelDownloadSize) the object is fetched with
+// concurrent ranged GETs; otherwise a single streaming GET is used.
+type DownloadOptions struct {
+	PartSize        int64
+	PartConcurrency int
+	Multipart       bool
 }
 
-// Download streams an object to a local path, creating parent directories.
-func Download(ctx context.Context, cl *s3.Client, bucket, key, localPath string, onProgress ProgressFunc) error {
+// Download fetches an object to a local path, creating parent directories. It
+// writes to a ".part" temp file and renames on success.
+func Download(ctx context.Context, cl *s3.Client, bucket, key, localPath string, opts DownloadOptions, onProgress ProgressFunc) error {
 	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		return err
 	}
+	tmp := localPath + ".part"
+
+	if opts.Multipart {
+		if size, err := ObjectSize(ctx, cl, bucket, key); err == nil && size >= MinParallelDownloadSize {
+			if derr := downloadParallel(ctx, cl, bucket, key, tmp, size, opts.PartSize, opts.PartConcurrency, onProgress); derr != nil {
+				return derr
+			}
+			return os.Rename(tmp, localPath)
+		}
+	}
+
 	out, err := cl.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -195,7 +143,6 @@ func Download(ctx context.Context, cl *s3.Client, bucket, key, localPath string,
 	}
 	defer out.Body.Close()
 
-	tmp := localPath + ".part"
 	f, err := os.Create(tmp)
 	if err != nil {
 		return err
@@ -211,6 +158,37 @@ func Download(ctx context.Context, cl *s3.Client, bucket, key, localPath string,
 		return closeErr
 	}
 	return os.Rename(tmp, localPath)
+}
+
+// StreamCopy copies an object across two (possibly different) connections/clients
+// by streaming the source body straight into a destination upload. Used for
+// cross-account / cross-endpoint copy where server-side CopyObject cannot reach.
+func StreamCopy(ctx context.Context, src, dst *s3.Client, srcBucket, srcKey, dstBucket, dstKey string, opts UploadOptions, onProgress ProgressFunc) error {
+	head, err := src.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(srcBucket), Key: aws.String(srcKey)})
+	if err != nil {
+		return err
+	}
+	size := aws.ToInt64(head.ContentLength)
+	ct := aws.ToString(head.ContentType)
+
+	out, err := src.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(srcBucket), Key: aws.String(srcKey)})
+	if err != nil {
+		return err
+	}
+	defer out.Body.Close()
+
+	in := &s3.PutObjectInput{
+		Bucket:        aws.String(dstBucket),
+		Key:           aws.String(dstKey),
+		Body:          &progressReader{r: out.Body, onProgress: onProgress},
+		ContentLength: aws.Int64(size),
+	}
+	if ct != "" {
+		in.ContentType = aws.String(ct)
+	}
+	opts.applyPut(in)
+	_, err = dst.PutObject(ctx, in)
+	return err
 }
 
 // DownloadBytes reads an object fully into memory (bounded by the caller via a

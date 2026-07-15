@@ -32,6 +32,7 @@ type AppSettings struct {
 	UploadStorageClass string `json:"uploadStorageClass"` // default storage class for uploads ("" = provider default)
 	UploadSSE          string `json:"uploadSSE"`          // "", "AES256", "aws:kms"
 	UploadKMSKeyID     string `json:"uploadKMSKeyId"`     // KMS key id when UploadSSE is "aws:kms"
+	PartConcurrency    int    `json:"partConcurrency"`    // concurrent parts per multipart transfer (default 4)
 }
 
 // BucketInfo describes a bucket in a connection.
@@ -123,8 +124,9 @@ type Task struct {
 	Status       TaskStatus `json:"status"`
 	ConnectionID string     `json:"connectionId"`
 	Bucket       string     `json:"bucket"`
-	Key          string     `json:"key"`        // primary/source object key
-	DestBucket   string     `json:"destBucket"` // copy/move target
+	Key          string     `json:"key"`            // primary/source object key
+	DestConnID   string     `json:"destConnId"`     // copy/move target connection (empty = same as ConnectionID)
+	DestBucket   string     `json:"destBucket"`     // copy/move target
 	DestKey      string     `json:"destKey"`
 	LocalPath    string     `json:"localPath"` // up/download local file path
 	Size         int64      `json:"size"`

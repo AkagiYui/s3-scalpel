@@ -203,7 +203,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     }
   };
 
-  const doCopyMove = async (destBucket: string, destPrefix: string) => {
+  const doCopyMove = async (destConnId: string, destBucket: string, destPrefix: string) => {
     const cm = copyMove();
     if (!cm) return;
     try {
@@ -212,6 +212,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         props.tab.connectionId,
         bucket(),
         cm.keys,
+        destConnId,
         destBucket,
         destPrefix,
         cm.move,
@@ -497,6 +498,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         move={copyMove()?.move ?? false}
         count={copyMove()?.keys.length ?? 0}
         buckets={buckets()}
+        currentConnId={props.tab.connectionId}
         defaultBucket={bucket()}
         defaultPrefix={prefix()}
         onConfirm={doCopyMove}

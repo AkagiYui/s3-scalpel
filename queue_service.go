@@ -152,8 +152,9 @@ func (s *QueueService) EnqueueDelete(windowID, connID, bucket string, keys []str
 }
 
 // EnqueueCopy queues copy or move operations into destBucket/destPrefix,
-// expanding folder keys recursively.
-func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []string, destBucket, destPrefix string, move bool, priority int) (int, error) {
+// expanding folder keys recursively. destConnID may name a different connection
+// than connID to copy across accounts/endpoints (streamed through this host).
+func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []string, destConnID, destBucket, destPrefix string, move bool, priority int) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cl, _, err := s.core.clientFor(ctx, connID)
@@ -177,7 +178,7 @@ func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []st
 				destKey := s3x.JoinKey(destPrefix, rel)
 				s.add(&model.Task{
 					WindowID: windowID, Type: ttype, ConnectionID: connID,
-					Bucket: srcBucket, Key: e.Key, DestBucket: destBucket, DestKey: destKey,
+					Bucket: srcBucket, Key: e.Key, DestConnID: destConnID, DestBucket: destBucket, DestKey: destKey,
 					Size: e.Size, Priority: priority,
 				})
 				count++
@@ -186,7 +187,7 @@ func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []st
 			destKey := s3x.JoinKey(destPrefix, path.Base(key))
 			s.add(&model.Task{
 				WindowID: windowID, Type: ttype, ConnectionID: connID,
-				Bucket: srcBucket, Key: key, DestBucket: destBucket, DestKey: destKey, Priority: priority,
+				Bucket: srcBucket, Key: key, DestConnID: destConnID, DestBucket: destBucket, DestKey: destKey, Priority: priority,
 			})
 			count++
 		}

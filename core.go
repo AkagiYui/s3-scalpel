@@ -86,6 +86,7 @@ func defaultSettings() model.AppSettings {
 		NotifySound:      true,
 		Concurrency:      5,
 		PartSize:         8 * 1024 * 1024,
+		PartConcurrency:  4,
 		MultipartEnabled: true,
 		AutoConsumeQueue: true,
 		PreviewMaxSize:   10 * 1024 * 1024,
@@ -116,6 +117,9 @@ func (c *Core) loadSettings() {
 		}
 		if s.PreviewMaxSize <= 0 {
 			s.PreviewMaxSize = 10 * 1024 * 1024
+		}
+		if s.PartConcurrency <= 0 {
+			s.PartConcurrency = 4
 		}
 		c.settings = s
 	}

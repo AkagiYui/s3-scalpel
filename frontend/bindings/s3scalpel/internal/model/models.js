@@ -164,6 +164,14 @@ export class AppSettings {
              */
             this["uploadKMSKeyId"] = "";
         }
+        if (!("partConcurrency" in $$source)) {
+            /**
+             * concurrent parts per multipart transfer (default 4)
+             * @member
+             * @type {number}
+             */
+            this["partConcurrency"] = 0;
+        }
 
         Object.assign(this, $$source);
     }
@@ -1296,6 +1304,14 @@ export class Task {
              * @type {string}
              */
             this["key"] = "";
+        }
+        if (!("destConnId" in $$source)) {
+            /**
+             * copy/move target connection (empty = same as ConnectionID)
+             * @member
+             * @type {string}
+             */
+            this["destConnId"] = "";
         }
         if (!("destBucket" in $$source)) {
             /**

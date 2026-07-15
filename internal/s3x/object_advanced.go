@@ -15,10 +15,11 @@ import (
 // UploadOptions carries optional per-upload settings (storage class, server-side
 // encryption, canned ACL) applied to PutObject / CreateMultipartUpload.
 type UploadOptions struct {
-	StorageClass string
-	SSEAlgorithm string // "", "AES256", "aws:kms"
-	KMSKeyID     string
-	ACL          string // canned ACL, e.g. "private", "public-read"
+	StorageClass    string
+	SSEAlgorithm    string // "", "AES256", "aws:kms"
+	KMSKeyID        string
+	ACL             string // canned ACL, e.g. "private", "public-read"
+	PartConcurrency int    // concurrent parts for multipart upload (0 = default)
 }
 
 func (o UploadOptions) applyPut(in *s3.PutObjectInput) {

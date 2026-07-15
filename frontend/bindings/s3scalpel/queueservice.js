@@ -35,19 +35,21 @@ export function ClearFinished(windowID) {
 
 /**
  * EnqueueCopy queues copy or move operations into destBucket/destPrefix,
- * expanding folder keys recursively.
+ * expanding folder keys recursively. destConnID may name a different connection
+ * than connID to copy across accounts/endpoints (streamed through this host).
  * @param {string} windowID
  * @param {string} connID
  * @param {string} srcBucket
  * @param {string[]} keys
+ * @param {string} destConnID
  * @param {string} destBucket
  * @param {string} destPrefix
  * @param {boolean} move
  * @param {number} priority
  * @returns {$CancellablePromise<number>}
  */
-export function EnqueueCopy(windowID, connID, srcBucket, keys, destBucket, destPrefix, move, priority) {
-    return $Call.ByID(3614479021, windowID, connID, srcBucket, keys, destBucket, destPrefix, move, priority);
+export function EnqueueCopy(windowID, connID, srcBucket, keys, destConnID, destBucket, destPrefix, move, priority) {
+    return $Call.ByID(3614479021, windowID, connID, srcBucket, keys, destConnID, destBucket, destPrefix, move, priority);
 }
 
 /**
