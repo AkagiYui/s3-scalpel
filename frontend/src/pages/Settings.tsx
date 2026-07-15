@@ -192,6 +192,41 @@ const Settings: Component = () => {
               />
             </Row>
             <Separator />
+            <Row label={t("settings.uploadStorageClass")} hint={t("settings.uploadStorageClassHint")}>
+              <SimpleSelect
+                class="w-52"
+                value={settings().uploadStorageClass ?? ""}
+                onChange={(v) => updateSettings({ uploadStorageClass: v })}
+                options={[
+                  { value: "", label: t("settings.providerDefault") },
+                  ...["STANDARD", "STANDARD_IA", "ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER", "DEEP_ARCHIVE", "GLACIER_IR"].map((c) => ({ value: c, label: c })),
+                ]}
+              />
+            </Row>
+            <Separator />
+            <Row label={t("settings.uploadEncryption")}>
+              <SimpleSelect
+                class="w-52"
+                value={settings().uploadSSE ?? ""}
+                onChange={(v) => updateSettings({ uploadSSE: v })}
+                options={[
+                  { value: "", label: t("settings.providerDefault") },
+                  { value: "AES256", label: "AES256 (SSE-S3)" },
+                  { value: "aws:kms", label: "aws:kms (SSE-KMS)" },
+                ]}
+              />
+            </Row>
+            <Show when={(settings().uploadSSE ?? "") === "aws:kms"}>
+              <Separator />
+              <Row label={t("settings.uploadKmsKey")}>
+                <Input
+                  class="w-64"
+                  value={settings().uploadKMSKeyId ?? ""}
+                  onInput={(e) => updateSettings({ uploadKMSKeyId: e.currentTarget.value })}
+                />
+              </Row>
+            </Show>
+            <Separator />
             <Row label={t("settings.previewMaxSize")}>
               <Input
                 type="number"

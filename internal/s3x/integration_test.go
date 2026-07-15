@@ -80,7 +80,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	var lastProgress int64
-	if err := Upload(ctx, cl, bucket, key, tmp, false, 0, func(n int64) { lastProgress = n }); err != nil {
+	if err := Upload(ctx, cl, bucket, key, tmp, false, 0, UploadOptions{}, func(n int64) { lastProgress = n }); err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
 	if lastProgress != int64(len(content)) {
@@ -164,7 +164,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	bigKey := prefix + "big.bin"
-	if err := Upload(ctx, cl, bucket, bigKey, bigLocal, true, MinPartSize, nil); err != nil {
+	if err := Upload(ctx, cl, bucket, bigKey, bigLocal, true, MinPartSize, UploadOptions{}, nil); err != nil {
 		t.Fatalf("multipart Upload: %v", err)
 	}
 	bigDst := filepath.Join(t.TempDir(), "big-dl.bin")

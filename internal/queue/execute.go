@@ -42,7 +42,12 @@ func (q *windowQueue) execute(ctx context.Context, t *model.Task) error {
 
 	switch t.Type {
 	case model.TaskUpload:
-		return s3x.Upload(ctx, cl, t.Bucket, t.Key, t.LocalPath, s.MultipartEnabled, s.PartSize, onProgress)
+		opts := s3x.UploadOptions{
+			StorageClass: s.UploadStorageClass,
+			SSEAlgorithm: s.UploadSSE,
+			KMSKeyID:     s.UploadKMSKeyID,
+		}
+		return s3x.Upload(ctx, cl, t.Bucket, t.Key, t.LocalPath, s.MultipartEnabled, s.PartSize, opts, onProgress)
 	case model.TaskDownload:
 		return s3x.Download(ctx, cl, t.Bucket, t.Key, t.LocalPath, onProgress)
 	case model.TaskDelete:

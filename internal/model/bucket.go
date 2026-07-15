@@ -47,3 +47,28 @@ type PublicAccessBlock struct {
 	BlockPublicPolicy     bool `json:"blockPublicPolicy"`
 	RestrictPublicBuckets bool `json:"restrictPublicBuckets"`
 }
+
+// ACLGrant is one grantee/permission pair in an object ACL.
+type ACLGrant struct {
+	Grantee    string `json:"grantee"`
+	Permission string `json:"permission"`
+	URI        string `json:"uri"`
+}
+
+// ObjectACL is a simplified view of an object's access control list.
+type ObjectACL struct {
+	Owner    string     `json:"owner"`
+	IsPublic bool       `json:"isPublic"`
+	Grants   []ACLGrant `json:"grants"`
+}
+
+// ObjectMetaUpdate carries the editable system/user metadata rewritten onto an
+// object via a self-copy.
+type ObjectMetaUpdate struct {
+	ContentType        string            `json:"contentType"`
+	CacheControl       string            `json:"cacheControl"`
+	ContentDisposition string            `json:"contentDisposition"`
+	ContentEncoding    string            `json:"contentEncoding"`
+	StorageClass       string            `json:"storageClass"`
+	Metadata           map[string]string `json:"metadata"`
+}

@@ -31,6 +31,9 @@ import {
   LifecycleRule,
   BucketEncryption,
   PublicAccessBlock,
+  ObjectACL,
+  ACLGrant,
+  ObjectMetaUpdate,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -51,6 +54,9 @@ export {
   LifecycleRule,
   BucketEncryption,
   PublicAccessBlock,
+  ObjectACL,
+  ACLGrant,
+  ObjectMetaUpdate,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */

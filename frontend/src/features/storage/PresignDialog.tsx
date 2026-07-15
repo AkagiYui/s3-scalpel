@@ -18,6 +18,7 @@ export const PresignDialog: Component<{
 }> = (props) => {
   const [amount, setAmount] = createSignal(1);
   const [unit, setUnit] = createSignal<"minutes" | "hours" | "days">("hours");
+  const [method, setMethod] = createSignal<"GET" | "PUT">("GET");
   const [url, setUrl] = createSignal("");
   const [busy, setBusy] = createSignal(false);
 
@@ -26,6 +27,7 @@ export const PresignDialog: Component<{
       setUrl("");
       setAmount(1);
       setUnit("hours");
+      setMethod("GET");
     }
   });
 
@@ -37,7 +39,10 @@ export const PresignDialog: Component<{
   const generate = async () => {
     setBusy(true);
     try {
-      const u = await S3Service.PresignGet(props.connId, props.bucket, props.objKey, props.versionId ?? "", seconds());
+      const u =
+        method() === "PUT"
+          ? await S3Service.PresignPut(props.connId, props.bucket, props.objKey, "", seconds())
+          : await S3Service.PresignGet(props.connId, props.bucket, props.objKey, props.versionId ?? "", seconds());
       setUrl(u);
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
@@ -59,6 +64,16 @@ export const PresignDialog: Component<{
           <DialogDescription>{t("presign.note")}</DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-3">
+          <Label>{t("presign.method")}</Label>
+          <SimpleSelect
+            class="w-48"
+            value={method()}
+            onChange={(v) => setMethod(v as any)}
+            options={[
+              { value: "GET", label: t("presign.methodGet") },
+              { value: "PUT", label: t("presign.methodPut") },
+            ]}
+          />
           <Label>{t("presign.expiry")}</Label>
           <div class="flex gap-2">
             <Input

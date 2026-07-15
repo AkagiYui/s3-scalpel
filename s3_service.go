@@ -152,6 +152,67 @@ func (s *S3Service) CreateFolder(connID, bucket, prefix, name string) error {
 	return s3x.CreateFolder(ctx, cl, bucket, key)
 }
 
+// PresignPut returns a presigned PUT URL for uploading to a key.
+func (s *S3Service) PresignPut(connID, bucket, key, contentType string, expirySeconds int) (string, error) {
+	ctx, cancel := opCtx()
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return "", err
+	}
+	if expirySeconds <= 0 {
+		expirySeconds = 3600
+	}
+	return s3x.PresignPut(ctx, cl, bucket, key, contentType, time.Duration(expirySeconds)*time.Second)
+}
+
+// GetACL returns a simplified view of an object's ACL.
+func (s *S3Service) GetACL(connID, bucket, key string) (model.ObjectACL, error) {
+	ctx, cancel := opCtx()
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return model.ObjectACL{}, err
+	}
+	return s3x.GetObjectACL(ctx, cl, bucket, key)
+}
+
+// SetACL applies a canned ACL to an object (e.g. "private", "public-read").
+func (s *S3Service) SetACL(connID, bucket, key, cannedACL string) error {
+	ctx, cancel := opCtx()
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return err
+	}
+	return s3x.SetObjectACL(ctx, cl, bucket, key, cannedACL)
+}
+
+// UpdateMetadata rewrites an object's system/user metadata and storage class.
+func (s *S3Service) UpdateMetadata(connID, bucket, key string, meta model.ObjectMetaUpdate) error {
+	ctx, cancel := opCtx()
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return err
+	}
+	return s3x.UpdateObjectMeta(ctx, cl, bucket, key, meta)
+}
+
+// Restore initiates a restore of an archived object for the given days/tier.
+func (s *S3Service) Restore(connID, bucket, key string, days int, tier string) error {
+	ctx, cancel := opCtx()
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return err
+	}
+	if days <= 0 {
+		days = 7
+	}
+	return s3x.RestoreObject(ctx, cl, bucket, key, int32(days), tier)
+}
+
 // CheckCapabilities probes which operations the connection's credentials are
 // permitted to perform. Pass an empty bucket for account-level probes only.
 func (s *S3Service) CheckCapabilities(connID, bucket string) ([]model.Capability, error) {

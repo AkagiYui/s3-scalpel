@@ -61,7 +61,7 @@ func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader, onProgre
 
 // Upload transfers a local file to S3, using manual multipart when enabled and
 // the file exceeds partSize. Progress is reported cumulatively.
-func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, multipart bool, partSize int64, onProgress ProgressFunc) error {
+func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, multipart bool, partSize int64, opts UploadOptions, onProgress ProgressFunc) error {
 	f, err := os.Open(localPath)
 	if err != nil {
 		return err
@@ -78,16 +78,18 @@ func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, m
 		partSize = MinPartSize
 	}
 	if !multipart || size <= partSize {
-		_, err := cl.PutObject(ctx, &s3.PutObjectInput{
+		in := &s3.PutObjectInput{
 			Bucket:        aws.String(bucket),
 			Key:           aws.String(key),
 			Body:          &progressReader{r: f, onProgress: onProgress},
 			ContentLength: aws.Int64(size),
 			ContentType:   aws.String(ct),
-		})
+		}
+		opts.applyPut(in)
+		_, err := cl.PutObject(ctx, in)
 		return err
 	}
-	return multipartUpload(ctx, cl, bucket, key, f, size, ct, partSize, onProgress)
+	return multipartUpload(ctx, cl, bucket, key, f, size, ct, partSize, opts, onProgress)
 }
 
 // progressReader wraps a reader to report cumulative bytes read.
@@ -108,12 +110,14 @@ func (p *progressReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func multipartUpload(ctx context.Context, cl *s3.Client, bucket, key string, f *os.File, size int64, ct string, partSize int64, onProgress ProgressFunc) error {
-	create, err := cl.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+func multipartUpload(ctx context.Context, cl *s3.Client, bucket, key string, f *os.File, size int64, ct string, partSize int64, opts UploadOptions, onProgress ProgressFunc) error {
+	createIn := &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(ct),
-	})
+	}
+	opts.applyCreateMultipart(createIn)
+	create, err := cl.CreateMultipartUpload(ctx, createIn)
 	if err != nil {
 		return err
 	}

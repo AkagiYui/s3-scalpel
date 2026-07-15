@@ -21,6 +21,7 @@ import {
   Search,
   ChevronLeft,
   ShieldCheck,
+  SlidersHorizontal,
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
@@ -32,6 +33,7 @@ import { DownloadDialog } from "./DownloadDialog";
 import { DestinationDialog } from "./DestinationDialog";
 import { PropertiesDialog } from "./PropertiesDialog";
 import { PresignDialog } from "./PresignDialog";
+import { ObjectSettingsDialog } from "./ObjectSettingsDialog";
 import { TagsDialog } from "./TagsDialog";
 import { VersionsDialog } from "./VersionsDialog";
 import { PreviewDialog } from "./PreviewDialog";
@@ -66,6 +68,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [propsKey, setPropsKey] = createSignal<string | null>(null);
   const [presignKey, setPresignKey] = createSignal<string | null>(null);
   const [tagsKey, setTagsKey] = createSignal<string | null>(null);
+  const [objSettingsKey, setObjSettingsKey] = createSignal<string | null>(null);
   const [versionsKey, setVersionsKey] = createSignal<string | null>(null);
   const [downloadKeys, setDownloadKeys] = createSignal<string[] | null>(null);
   const [copyMove, setCopyMove] = createSignal<{ keys: string[]; move: boolean } | null>(null);
@@ -272,6 +275,10 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         <p.Item onSelect={() => setTagsKey(p.entry.key)}>
           <TagIcon class="h-4 w-4" />
           {t("storage.tags")}
+        </p.Item>
+        <p.Item onSelect={() => setObjSettingsKey(p.entry.key)}>
+          <SlidersHorizontal class="h-4 w-4" />
+          {t("storage.objectSettings")}
         </p.Item>
         <p.Item onSelect={() => setVersionsKey(p.entry.key)}>
           <History class="h-4 w-4" />
@@ -514,6 +521,9 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       </Show>
       <Show when={tagsKey()}>
         <TagsDialog open onOpenChange={(o) => !o && setTagsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={tagsKey()!} />
+      </Show>
+      <Show when={objSettingsKey()}>
+        <ObjectSettingsDialog open onOpenChange={(o) => !o && setObjSettingsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={objSettingsKey()!} />
       </Show>
       <Show when={versionsKey()}>
         <VersionsDialog open onOpenChange={(o) => !o && setVersionsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={versionsKey()!} />

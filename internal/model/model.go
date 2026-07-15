@@ -28,6 +28,10 @@ type AppSettings struct {
 	AutoConsumeQueue   bool   `json:"autoConsumeQueue"`   // automatically run queued tasks
 	PreviewMaxSize     int64  `json:"previewMaxSize"`     // max bytes to download for preview
 	DefaultDownloadDir string `json:"defaultDownloadDir"` // remembered download directory
+
+	UploadStorageClass string `json:"uploadStorageClass"` // default storage class for uploads ("" = provider default)
+	UploadSSE          string `json:"uploadSSE"`          // "", "AES256", "aws:kms"
+	UploadKMSKeyID     string `json:"uploadKMSKeyId"`     // KMS key id when UploadSSE is "aws:kms"
 }
 
 // BucketInfo describes a bucket in a connection.

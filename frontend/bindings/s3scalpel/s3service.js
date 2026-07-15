@@ -62,6 +62,19 @@ export function DeleteBucket(connID, name) {
 }
 
 /**
+ * GetACL returns a simplified view of an object's ACL.
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} key
+ * @returns {$CancellablePromise<model$0.ObjectACL>}
+ */
+export function GetACL(connID, bucket, key) {
+    return $Call.ByID(2496901791, connID, bucket, key).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
  * GetTags returns an object's tag set.
  * @param {string} connID
  * @param {string} bucket
@@ -70,7 +83,7 @@ export function DeleteBucket(connID, name) {
  */
 export function GetTags(connID, bucket, key) {
     return $Call.ByID(2610821468, connID, bucket, key).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }));
 }
 
@@ -83,7 +96,7 @@ export function GetTags(connID, bucket, key) {
  */
 export function ListAll(connID, bucket, prefix) {
     return $Call.ByID(560236730, connID, bucket, prefix).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType6($result);
     }));
 }
 
@@ -94,7 +107,7 @@ export function ListAll(connID, bucket, prefix) {
  */
 export function ListBuckets(connID) {
     return $Call.ByID(1318176394, connID).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType8($result);
     }));
 }
 
@@ -108,7 +121,7 @@ export function ListBuckets(connID) {
  */
 export function ListObjects(connID, bucket, prefix, token) {
     return $Call.ByID(4121172557, connID, bucket, prefix, token).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
 }
 
@@ -121,7 +134,7 @@ export function ListObjects(connID, bucket, prefix, token) {
  */
 export function ListVersions(connID, bucket, key) {
     return $Call.ByID(3392385798, connID, bucket, key).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
     }));
 }
 
@@ -139,6 +152,19 @@ export function PresignGet(connID, bucket, key, versionID, expirySeconds) {
 }
 
 /**
+ * PresignPut returns a presigned PUT URL for uploading to a key.
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} key
+ * @param {string} contentType
+ * @param {number} expirySeconds
+ * @returns {$CancellablePromise<string>}
+ */
+export function PresignPut(connID, bucket, key, contentType, expirySeconds) {
+    return $Call.ByID(280571858, connID, bucket, key, contentType, expirySeconds);
+}
+
+/**
  * Properties returns full object metadata (HeadObject).
  * @param {string} connID
  * @param {string} bucket
@@ -148,7 +174,7 @@ export function PresignGet(connID, bucket, key, versionID, expirySeconds) {
  */
 export function Properties(connID, bucket, key, versionID) {
     return $Call.ByID(2156449790, connID, bucket, key, versionID).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType12($result);
     }));
 }
 
@@ -165,6 +191,43 @@ export function PutTags(connID, bucket, key, tags) {
 }
 
 /**
+ * Restore initiates a restore of an archived object for the given days/tier.
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} key
+ * @param {number} days
+ * @param {string} tier
+ * @returns {$CancellablePromise<void>}
+ */
+export function Restore(connID, bucket, key, days, tier) {
+    return $Call.ByID(463185327, connID, bucket, key, days, tier);
+}
+
+/**
+ * SetACL applies a canned ACL to an object (e.g. "private", "public-read").
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} key
+ * @param {string} cannedACL
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetACL(connID, bucket, key, cannedACL) {
+    return $Call.ByID(2886702747, connID, bucket, key, cannedACL);
+}
+
+/**
+ * UpdateMetadata rewrites an object's system/user metadata and storage class.
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} key
+ * @param {model$0.ObjectMetaUpdate} meta
+ * @returns {$CancellablePromise<void>}
+ */
+export function UpdateMetadata(connID, bucket, key, meta) {
+    return $Call.ByID(4013567539, connID, bucket, key, meta);
+}
+
+/**
  * VersioningEnabled reports whether a bucket has versioning enabled.
  * @param {string} connID
  * @param {string} bucket
@@ -177,13 +240,14 @@ export function VersioningEnabled(connID, bucket) {
 // Private type creation functions
 const $$createType0 = model$0.Capability.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = model$0.Tag.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = model$0.ObjectEntry.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = model$0.BucketInfo.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = model$0.ListResult.createFrom;
-const $$createType9 = model$0.ObjectVersion.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = model$0.ObjectProperties.createFrom;
+const $$createType2 = model$0.ObjectACL.createFrom;
+const $$createType3 = model$0.Tag.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = model$0.ObjectEntry.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = model$0.BucketInfo.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = model$0.ListResult.createFrom;
+const $$createType10 = model$0.ObjectVersion.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = model$0.ObjectProperties.createFrom;

@@ -7,6 +7,51 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * ACLGrant is one grantee/permission pair in an object ACL.
+ */
+export class ACLGrant {
+    /**
+     * Creates a new ACLGrant instance.
+     * @param {Partial<ACLGrant>} [$$source = {}] - The source object to create the ACLGrant.
+     */
+    constructor($$source = {}) {
+        if (!("grantee" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["grantee"] = "";
+        }
+        if (!("permission" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["permission"] = "";
+        }
+        if (!("uri" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["uri"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ACLGrant instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ACLGrant}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ACLGrant(/** @type {Partial<ACLGrant>} */($$parsedSource));
+    }
+}
+
+/**
  * AppSettings is the persisted application configuration. Shared across windows.
  */
 export class AppSettings {
@@ -94,6 +139,30 @@ export class AppSettings {
              * @type {string}
              */
             this["defaultDownloadDir"] = "";
+        }
+        if (!("uploadStorageClass" in $$source)) {
+            /**
+             * default storage class for uploads ("" = provider default)
+             * @member
+             * @type {string}
+             */
+            this["uploadStorageClass"] = "";
+        }
+        if (!("uploadSSE" in $$source)) {
+            /**
+             * "", "AES256", "aws:kms"
+             * @member
+             * @type {string}
+             */
+            this["uploadSSE"] = "";
+        }
+        if (!("uploadKMSKeyId" in $$source)) {
+            /**
+             * KMS key id when UploadSSE is "aws:kms"
+             * @member
+             * @type {string}
+             */
+            this["uploadKMSKeyId"] = "";
         }
 
         Object.assign(this, $$source);
@@ -603,6 +672,55 @@ export class ListResult {
 }
 
 /**
+ * ObjectACL is a simplified view of an object's access control list.
+ */
+export class ObjectACL {
+    /**
+     * Creates a new ObjectACL instance.
+     * @param {Partial<ObjectACL>} [$$source = {}] - The source object to create the ObjectACL.
+     */
+    constructor($$source = {}) {
+        if (!("owner" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["owner"] = "";
+        }
+        if (!("isPublic" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["isPublic"] = false;
+        }
+        if (!("grants" in $$source)) {
+            /**
+             * @member
+             * @type {ACLGrant[]}
+             */
+            this["grants"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ObjectACL instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ObjectACL}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("grants" in $$parsedSource) {
+            $$parsedSource["grants"] = $$createField2_0($$parsedSource["grants"]);
+        }
+        return new ObjectACL(/** @type {Partial<ObjectACL>} */($$parsedSource));
+    }
+}
+
+/**
  * ObjectEntry is one row in a folder-style object listing.
  */
 export class ObjectEntry {
@@ -676,6 +794,77 @@ export class ObjectEntry {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new ObjectEntry(/** @type {Partial<ObjectEntry>} */($$parsedSource));
+    }
+}
+
+/**
+ * ObjectMetaUpdate carries the editable system/user metadata rewritten onto an
+ * object via a self-copy.
+ */
+export class ObjectMetaUpdate {
+    /**
+     * Creates a new ObjectMetaUpdate instance.
+     * @param {Partial<ObjectMetaUpdate>} [$$source = {}] - The source object to create the ObjectMetaUpdate.
+     */
+    constructor($$source = {}) {
+        if (!("contentType" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["contentType"] = "";
+        }
+        if (!("cacheControl" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["cacheControl"] = "";
+        }
+        if (!("contentDisposition" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["contentDisposition"] = "";
+        }
+        if (!("contentEncoding" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["contentEncoding"] = "";
+        }
+        if (!("storageClass" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["storageClass"] = "";
+        }
+        if (!("metadata" in $$source)) {
+            /**
+             * @member
+             * @type {{ [_ in string]?: string }}
+             */
+            this["metadata"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ObjectMetaUpdate instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ObjectMetaUpdate}
+     */
+    static createFrom($$source = {}) {
+        const $$createField5_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("metadata" in $$parsedSource) {
+            $$parsedSource["metadata"] = $$createField5_0($$parsedSource["metadata"]);
+        }
+        return new ObjectMetaUpdate(/** @type {Partial<ObjectMetaUpdate>} */($$parsedSource));
     }
 }
 
@@ -775,7 +964,7 @@ export class ObjectProperties {
      * @returns {ObjectProperties}
      */
     static createFrom($$source = {}) {
-        const $$createField10_0 = $$createType3;
+        const $$createField10_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("metadata" in $$parsedSource) {
             $$parsedSource["metadata"] = $$createField10_0($$parsedSource["metadata"]);
@@ -1281,4 +1470,6 @@ export class TestResult {
 const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = ObjectEntry.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = $Create.Map($Create.Any, $Create.Any);
+const $$createType3 = ACLGrant.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $Create.Map($Create.Any, $Create.Any);
