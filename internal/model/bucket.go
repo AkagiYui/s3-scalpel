@@ -62,6 +62,26 @@ type ObjectACL struct {
 	Grants   []ACLGrant `json:"grants"`
 }
 
+// StorageClassStat is the per-storage-class portion of a PrefixStats aggregate.
+type StorageClassStat struct {
+	Count int64 `json:"count"`
+	Size  int64 `json:"size"`
+}
+
+// PrefixStats aggregates object count and cumulative size under a prefix.
+type PrefixStats struct {
+	Prefix         string                      `json:"prefix"`
+	ObjectCount    int64                       `json:"objectCount"`
+	TotalSize      int64                       `json:"totalSize"`
+	ByStorageClass map[string]StorageClassStat `json:"byStorageClass"`
+}
+
+// SearchResult is a page of recursive search hits.
+type SearchResult struct {
+	Entries   []ObjectEntry `json:"entries"`
+	Truncated bool          `json:"truncated"`
+}
+
 // ObjectMetaUpdate carries the editable system/user metadata rewritten onto an
 // object via a self-copy.
 type ObjectMetaUpdate struct {

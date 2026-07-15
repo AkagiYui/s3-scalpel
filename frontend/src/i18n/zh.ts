@@ -108,6 +108,10 @@ export const zh: Dict = {
     filter: "按名称过滤…",
     goToPath: "跳转到路径…",
     home: "根目录",
+    deepSearch: "递归搜索当前目录",
+    stats: "目录统计",
+    searchResults: "找到 {{ count }} 个匹配项",
+    searchTruncated: "（仅显示前 1000 个）",
     colName: "名称",
     colSize: "大小",
     colModified: "修改时间",
@@ -319,6 +323,12 @@ export const zh: Dict = {
       objectTagging: "对象标签",
       deleteObject: "删除对象",
     },
+  },
+  stats: {
+    title: "目录统计",
+    objectCount: "对象数",
+    totalSize: "总大小",
+    byStorageClass: "按存储类别",
   },
   bucketSettings: {
     title: "存储桶设置 — {{ name }}",

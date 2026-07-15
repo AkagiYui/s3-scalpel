@@ -22,6 +22,8 @@ import {
   ChevronLeft,
   ShieldCheck,
   SlidersHorizontal,
+  BarChart3,
+  X as XIcon,
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
@@ -34,6 +36,7 @@ import { DestinationDialog } from "./DestinationDialog";
 import { PropertiesDialog } from "./PropertiesDialog";
 import { PresignDialog } from "./PresignDialog";
 import { ObjectSettingsDialog } from "./ObjectSettingsDialog";
+import { StatsDialog } from "./StatsDialog";
 import { TagsDialog } from "./TagsDialog";
 import { VersionsDialog } from "./VersionsDialog";
 import { PreviewDialog } from "./PreviewDialog";
@@ -55,6 +58,10 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [loading, setLoading] = createSignal(false);
   const [nextToken, setNextToken] = createSignal("");
   const [filter, setFilter] = createSignal("");
+  const [searchResults, setSearchResults] = createSignal<ObjectEntry[] | null>(null);
+  const [searchTruncated, setSearchTruncated] = createSignal(false);
+  const [searching, setSearching] = createSignal(false);
+  const [statsOpen, setStatsOpen] = createSignal(false);
   const [sortKey, setSortKey] = createSignal<SortKey>("name");
   const [sortDir, setSortDir] = createSignal<SortDir>("asc");
   const [selected, setSelected] = createSignal<Set<string>>(new Set<string>());
@@ -100,6 +107,8 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       () => {
         setSelected(new Set<string>());
         setFilter("");
+        setSearchResults(null);
+        setSearchTruncated(false);
         load(true);
       }
     )
@@ -133,7 +142,35 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     });
   });
 
-  const visible = createMemo(() => sortEntries(filterEntries(entries(), filter()), sortKey(), sortDir()));
+  const visible = createMemo(() => {
+    const sr = searchResults();
+    if (sr !== null) return sortEntries(sr, sortKey(), sortDir());
+    return sortEntries(filterEntries(entries(), filter()), sortKey(), sortDir());
+  });
+
+  const runSearch = async () => {
+    const q = filter().trim();
+    if (!q) {
+      setSearchResults(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      const res = await S3Service.Search(props.tab.connectionId, bucket(), prefix(), q, 1000);
+      setSearchResults(res.entries ?? []);
+      setSearchTruncated(res.truncated ?? false);
+      setSelected(new Set<string>());
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchResults(null);
+    setSearchTruncated(false);
+  };
 
   const allSelected = () => visible().length > 0 && visible().every((e) => selected().has(e.key));
   const toggleAll = () => {
@@ -346,9 +383,19 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
               class="h-8 w-44 pl-7"
               placeholder={t("storage.filter")}
               value={filter()}
-              onInput={(e) => setFilter(e.currentTarget.value)}
+              onInput={(e) => {
+                setFilter(e.currentTarget.value);
+                if (searchResults() !== null) clearSearch();
+              }}
+              onKeyDown={(e) => e.key === "Enter" && runSearch()}
             />
           </div>
+          <Button size="icon-sm" variant="outline" onClick={runSearch} title={t("storage.deepSearch")} disabled={searching()}>
+            <Search class={cn("h-3.5 w-3.5", searching() && "animate-pulse")} />
+          </Button>
+          <Button size="icon-sm" variant="outline" onClick={() => setStatsOpen(true)} title={t("storage.stats")}>
+            <BarChart3 class="h-3.5 w-3.5" />
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setJumpOpen(true)} title={t("storage.goToPath")}>
             {t("storage.goToPath")}
           </Button>
@@ -380,6 +427,20 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Search-results banner */}
+      <Show when={searchResults() !== null}>
+        <div class="flex items-center gap-2 border-b bg-primary/10 px-3 py-1.5 text-sm">
+          <Search class="h-3.5 w-3.5" />
+          <span>{t("storage.searchResults", { count: visible().length })}</span>
+          <Show when={searchTruncated()}>
+            <span class="text-xs text-amber-500">{t("storage.searchTruncated")}</span>
+          </Show>
+          <Button size="icon-sm" variant="ghost" class="ml-auto" onClick={clearSearch} title={t("common.close")}>
+            <XIcon class="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </Show>
 
       {/* Bulk action bar */}
       <Show when={selected().size > 0}>
@@ -531,6 +592,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         <VersionsDialog open onOpenChange={(o) => !o && setVersionsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={versionsKey()!} />
       </Show>
       <CapabilitiesDialog open={capsOpen()} onOpenChange={setCapsOpen} connId={props.tab.connectionId} bucket={bucket()} />
+      <StatsDialog open={statsOpen()} onOpenChange={setStatsOpen} connId={props.tab.connectionId} bucket={bucket()} prefix={prefix()} />
     </div>
   );
 };

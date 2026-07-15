@@ -71,6 +71,36 @@ func (s *S3Service) ListAll(connID, bucket, prefix string) ([]model.ObjectEntry,
 	return s3x.ListAllObjects(ctx, cl, bucket, prefix)
 }
 
+// Search recursively scans objects under a prefix and returns those whose name
+// contains the query (case-insensitive), up to a bounded number of hits.
+func (s *S3Service) Search(connID, bucket, prefix, query string, maxResults int) (model.SearchResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return model.SearchResult{}, err
+	}
+	if maxResults <= 0 {
+		maxResults = 1000
+	}
+	entries, truncated, err := s3x.SearchObjects(ctx, cl, bucket, prefix, query, maxResults)
+	if err != nil {
+		return model.SearchResult{}, err
+	}
+	return model.SearchResult{Entries: entries, Truncated: truncated}, nil
+}
+
+// Stats aggregates object count and cumulative size under a prefix.
+func (s *S3Service) Stats(connID, bucket, prefix string) (model.PrefixStats, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return model.PrefixStats{}, err
+	}
+	return s3x.PrefixStats(ctx, cl, bucket, prefix)
+}
+
 // Properties returns full object metadata (HeadObject).
 func (s *S3Service) Properties(connID, bucket, key, versionID string) (model.ObjectProperties, error) {
 	ctx, cancel := opCtx()

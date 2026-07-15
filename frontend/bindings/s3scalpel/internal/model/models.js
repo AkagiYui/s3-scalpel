@@ -1055,6 +1055,62 @@ export class ObjectVersion {
 }
 
 /**
+ * PrefixStats aggregates object count and cumulative size under a prefix.
+ */
+export class PrefixStats {
+    /**
+     * Creates a new PrefixStats instance.
+     * @param {Partial<PrefixStats>} [$$source = {}] - The source object to create the PrefixStats.
+     */
+    constructor($$source = {}) {
+        if (!("prefix" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["prefix"] = "";
+        }
+        if (!("objectCount" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["objectCount"] = 0;
+        }
+        if (!("totalSize" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["totalSize"] = 0;
+        }
+        if (!("byStorageClass" in $$source)) {
+            /**
+             * @member
+             * @type {{ [_ in string]?: StorageClassStat }}
+             */
+            this["byStorageClass"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PrefixStats instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PrefixStats}
+     */
+    static createFrom($$source = {}) {
+        const $$createField3_0 = $$createType7;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("byStorageClass" in $$parsedSource) {
+            $$parsedSource["byStorageClass"] = $$createField3_0($$parsedSource["byStorageClass"]);
+        }
+        return new PrefixStats(/** @type {Partial<PrefixStats>} */($$parsedSource));
+    }
+}
+
+/**
  * PreviewData is returned to the frontend for object preview.
  */
 export class PreviewData {
@@ -1203,6 +1259,86 @@ export class PublicAccessBlock {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new PublicAccessBlock(/** @type {Partial<PublicAccessBlock>} */($$parsedSource));
+    }
+}
+
+/**
+ * SearchResult is a page of recursive search hits.
+ */
+export class SearchResult {
+    /**
+     * Creates a new SearchResult instance.
+     * @param {Partial<SearchResult>} [$$source = {}] - The source object to create the SearchResult.
+     */
+    constructor($$source = {}) {
+        if (!("entries" in $$source)) {
+            /**
+             * @member
+             * @type {ObjectEntry[]}
+             */
+            this["entries"] = [];
+        }
+        if (!("truncated" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SearchResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {SearchResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("entries" in $$parsedSource) {
+            $$parsedSource["entries"] = $$createField0_0($$parsedSource["entries"]);
+        }
+        return new SearchResult(/** @type {Partial<SearchResult>} */($$parsedSource));
+    }
+}
+
+/**
+ * StorageClassStat is the per-storage-class portion of a PrefixStats aggregate.
+ */
+export class StorageClassStat {
+    /**
+     * Creates a new StorageClassStat instance.
+     * @param {Partial<StorageClassStat>} [$$source = {}] - The source object to create the StorageClassStat.
+     */
+    constructor($$source = {}) {
+        if (!("count" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["count"] = 0;
+        }
+        if (!("size" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["size"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new StorageClassStat instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {StorageClassStat}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new StorageClassStat(/** @type {Partial<StorageClassStat>} */($$parsedSource));
     }
 }
 
@@ -1489,3 +1625,5 @@ const $$createType2 = $Create.Array($$createType1);
 const $$createType3 = ACLGrant.createFrom;
 const $$createType4 = $Create.Array($$createType3);
 const $$createType5 = $Create.Map($Create.Any, $Create.Any);
+const $$createType6 = StorageClassStat.createFrom;
+const $$createType7 = $Create.Map($Create.Any, $$createType6);

@@ -106,6 +106,10 @@ export const en = {
     filter: "Filter by name…",
     goToPath: "Go to path…",
     home: "Home",
+    deepSearch: "Search this folder recursively",
+    stats: "Folder statistics",
+    searchResults: "{{ count }} match(es) found",
+    searchTruncated: "(showing first 1000)",
     colName: "Name",
     colSize: "Size",
     colModified: "Modified",
@@ -318,6 +322,12 @@ export const en = {
       objectTagging: "Object tagging",
       deleteObject: "Delete object",
     },
+  },
+  stats: {
+    title: "Folder Statistics",
+    objectCount: "Objects",
+    totalSize: "Total size",
+    byStorageClass: "By storage class",
   },
   bucketSettings: {
     title: 'Bucket Settings — {{ name }}',

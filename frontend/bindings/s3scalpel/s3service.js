@@ -204,6 +204,22 @@ export function Restore(connID, bucket, key, days, tier) {
 }
 
 /**
+ * Search recursively scans objects under a prefix and returns those whose name
+ * contains the query (case-insensitive), up to a bounded number of hits.
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} prefix
+ * @param {string} query
+ * @param {number} maxResults
+ * @returns {$CancellablePromise<model$0.SearchResult>}
+ */
+export function Search(connID, bucket, prefix, query, maxResults) {
+    return $Call.ByID(3456220647, connID, bucket, prefix, query, maxResults).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType13($result);
+    }));
+}
+
+/**
  * SetACL applies a canned ACL to an object (e.g. "private", "public-read").
  * @param {string} connID
  * @param {string} bucket
@@ -213,6 +229,19 @@ export function Restore(connID, bucket, key, days, tier) {
  */
 export function SetACL(connID, bucket, key, cannedACL) {
     return $Call.ByID(2886702747, connID, bucket, key, cannedACL);
+}
+
+/**
+ * Stats aggregates object count and cumulative size under a prefix.
+ * @param {string} connID
+ * @param {string} bucket
+ * @param {string} prefix
+ * @returns {$CancellablePromise<model$0.PrefixStats>}
+ */
+export function Stats(connID, bucket, prefix) {
+    return $Call.ByID(2895920042, connID, bucket, prefix).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType14($result);
+    }));
 }
 
 /**
@@ -251,3 +280,5 @@ const $$createType9 = model$0.ListResult.createFrom;
 const $$createType10 = model$0.ObjectVersion.createFrom;
 const $$createType11 = $Create.Array($$createType10);
 const $$createType12 = model$0.ObjectProperties.createFrom;
+const $$createType13 = model$0.SearchResult.createFrom;
+const $$createType14 = model$0.PrefixStats.createFrom;
