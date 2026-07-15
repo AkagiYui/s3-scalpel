@@ -520,6 +520,39 @@ export class Connection {
              */
             this["secretKey"] = "";
         }
+        if (!("sessionToken" in $$source)) {
+            /**
+             * optional STS temporary-credential token
+             * @member
+             * @type {string}
+             */
+            this["sessionToken"] = "";
+        }
+        if (!("skipTlsVerify" in $$source)) {
+            /**
+             * Transport options for self-hosted / restricted endpoints.
+             * do not verify the server certificate
+             * @member
+             * @type {boolean}
+             */
+            this["skipTlsVerify"] = false;
+        }
+        if (!("proxyUrl" in $$source)) {
+            /**
+             * optional HTTP/HTTPS/SOCKS proxy URL
+             * @member
+             * @type {string}
+             */
+            this["proxyUrl"] = "";
+        }
+        if (!("caCert" in $$source)) {
+            /**
+             * optional PEM CA bundle to trust
+             * @member
+             * @type {string}
+             */
+            this["caCert"] = "";
+        }
         if (!("createdAt" in $$source)) {
             /**
              * @member

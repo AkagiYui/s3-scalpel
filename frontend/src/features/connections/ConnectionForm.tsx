@@ -1,10 +1,11 @@
 import { createSignal, createEffect, Show, type Component } from "solid-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
-import { Input, Label } from "~/components/ui/primitives";
+import { Input, Label, Textarea } from "~/components/ui/primitives";
 import { SimpleSelect } from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
 import { Spinner } from "~/components/ui/primitives";
-import { CheckCircle2, XCircle } from "lucide-solid";
+import { CheckCircle2, XCircle, ChevronDown, ChevronRight } from "lucide-solid";
 import { ConfigService, type Connection, type TestResult } from "~/lib/api";
 import { saveConnection } from "~/stores/connections";
 import { toast } from "~/components/ui/toast";
@@ -19,6 +20,10 @@ function blank(): Connection {
     pathStyle: true,
     accessKey: "",
     secretKey: "",
+    sessionToken: "",
+    skipTlsVerify: false,
+    proxyUrl: "",
+    caCert: "",
     createdAt: 0,
   } as Connection;
 }
@@ -32,12 +37,15 @@ export const ConnectionForm: Component<{
   const [testing, setTesting] = createSignal(false);
   const [testRes, setTestRes] = createSignal<TestResult | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const [showAdvanced, setShowAdvanced] = createSignal(false);
 
   // Reset the form whenever the dialog opens.
   createEffect(() => {
     if (props.open) {
-      setForm(props.edit ? { ...props.edit } : blank());
+      const f = props.edit ? { ...props.edit } : blank();
+      setForm(f);
       setTestRes(null);
+      setShowAdvanced(!!(f.sessionToken || f.skipTlsVerify || f.proxyUrl || f.caCert));
     }
   });
 
@@ -140,6 +148,56 @@ export const ConnectionForm: Component<{
               onInput={(e) => set("secretKey", e.currentTarget.value)}
             />
           </div>
+
+          <button
+            type="button"
+            class="flex items-center gap-1 self-start text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            <Show when={showAdvanced()} fallback={<ChevronRight class="h-4 w-4" />}>
+              <ChevronDown class="h-4 w-4" />
+            </Show>
+            {t("connections.advanced")}
+          </button>
+
+          <Show when={showAdvanced()}>
+            <div class="grid gap-4 rounded-md border border-dashed p-3">
+              <div class="grid gap-1.5">
+                <Label>{t("connections.sessionToken")}</Label>
+                <Input
+                  type="password"
+                  value={form().sessionToken ?? ""}
+                  autocomplete="off"
+                  placeholder={t("common.optional")}
+                  onInput={(e) => set("sessionToken", e.currentTarget.value)}
+                />
+              </div>
+              <div class="grid gap-1.5">
+                <Label>{t("connections.proxyUrl")}</Label>
+                <Input
+                  value={form().proxyUrl ?? ""}
+                  placeholder="http://127.0.0.1:8080"
+                  onInput={(e) => set("proxyUrl", e.currentTarget.value)}
+                />
+              </div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-medium">{t("connections.skipTlsVerify")}</div>
+                  <div class="text-xs text-muted-foreground">{t("connections.skipTlsVerifyHint")}</div>
+                </div>
+                <Switch checked={form().skipTlsVerify ?? false} onChange={(v) => set("skipTlsVerify", v)} />
+              </div>
+              <div class="grid gap-1.5">
+                <Label>{t("connections.caCert")}</Label>
+                <Textarea
+                  class="min-h-[6rem] font-mono text-xs"
+                  value={form().caCert ?? ""}
+                  placeholder={"-----BEGIN CERTIFICATE-----"}
+                  onInput={(e) => set("caCert", e.currentTarget.value)}
+                />
+              </div>
+            </div>
+          </Show>
 
           <Show when={testRes()}>
             <div

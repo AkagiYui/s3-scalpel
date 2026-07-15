@@ -6,14 +6,21 @@ package model
 // Connection is a single S3-compatible account configuration. It deliberately
 // does NOT include a bucket name: buckets are listed after connecting.
 type Connection struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`      // display name
-	Endpoint  string `json:"endpoint"`  // e.g. https://cn-nb1.example.com
-	Region    string `json:"region"`    // SigV4 region; "auto" for R2
-	PathStyle bool   `json:"pathStyle"` // true = path-style (MinIO), false = virtual-hosted
-	AccessKey string `json:"accessKey"`
-	SecretKey string `json:"secretKey"`
-	CreatedAt int64  `json:"createdAt"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`         // display name
+	Endpoint     string `json:"endpoint"`     // e.g. https://cn-nb1.example.com
+	Region       string `json:"region"`       // SigV4 region; "auto" for R2
+	PathStyle    bool   `json:"pathStyle"`    // true = path-style (MinIO), false = virtual-hosted
+	AccessKey    string `json:"accessKey"`
+	SecretKey    string `json:"secretKey"`
+	SessionToken string `json:"sessionToken"` // optional STS temporary-credential token
+
+	// Transport options for self-hosted / restricted endpoints.
+	SkipTLSVerify bool   `json:"skipTlsVerify"` // do not verify the server certificate
+	ProxyURL      string `json:"proxyUrl"`      // optional HTTP/HTTPS/SOCKS proxy URL
+	CACert        string `json:"caCert"`        // optional PEM CA bundle to trust
+
+	CreatedAt int64 `json:"createdAt"`
 }
 
 // AppSettings is the persisted application configuration. Shared across windows.

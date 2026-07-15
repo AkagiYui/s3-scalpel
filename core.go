@@ -19,7 +19,7 @@ import (
 
 const (
 	settingsFile = "settings.json"
-	connsFile    = "connections.json"
+	connsFile    = "connections.enc"
 )
 
 // Core holds all shared backend state. A single instance is shared by every
@@ -134,7 +134,7 @@ func (c *Core) saveSettings() error {
 
 func (c *Core) loadConnections() {
 	var conns []model.Connection
-	if _, err := c.store.ReadJSON(connsFile, &conns); err == nil {
+	if _, err := c.store.ReadEncrypted(connsFile, &conns); err == nil {
 		c.conns = conns
 	}
 }
@@ -144,7 +144,7 @@ func (c *Core) saveConnections() error {
 	conns := make([]model.Connection, len(c.conns))
 	copy(conns, c.conns)
 	c.connMu.RUnlock()
-	return c.store.WriteJSON(connsFile, conns)
+	return c.store.WriteEncrypted(connsFile, conns)
 }
 
 func (c *Core) getConnection(id string) (model.Connection, bool) {

@@ -3,11 +3,20 @@
 package store
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
 )
+
+// keyFile holds the locally-generated 32-byte key used to encrypt sensitive
+// files at rest. It is created with 0600 permissions on first use.
+const keyFile = ".s3scalpel.key"
 
 // Store owns a base directory and serialises writes per file path.
 type Store struct {
@@ -59,6 +68,94 @@ func (s *Store) WriteJSON(name string, v any) error {
 		return err
 	}
 	return writeFileAtomic(s.Path(name), data)
+}
+
+// key returns the per-installation encryption key, generating and persisting it
+// (0600) the first time. The key lives beside the data so this protects against
+// casual disk inspection and accidental sharing of the config file, not against
+// an attacker with full read access to the data directory.
+func (s *Store) key() ([]byte, error) {
+	path := s.Path(keyFile)
+	if data, err := os.ReadFile(path); err == nil && len(data) == 32 {
+		return data, nil
+	}
+	k := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, k); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(path, k, 0o600); err != nil {
+		return nil, err
+	}
+	return k, nil
+}
+
+// WriteEncrypted marshals v to JSON and writes it AES-256-GCM encrypted.
+func (s *Store) WriteEncrypted(name string, v any) error {
+	plain, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	k, err := s.key()
+	if err != nil {
+		return err
+	}
+	block, err := aes.NewCipher(k)
+	if err != nil {
+		return err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return err
+	}
+	sealed := gcm.Seal(nonce, nonce, plain, nil)
+	return writeFileAtomic(s.Path(name), sealed)
+}
+
+// ReadEncrypted reads and decrypts the named file into v. Missing files are not
+// an error (v is left untouched).
+func (s *Store) ReadEncrypted(name string, v any) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := os.ReadFile(s.Path(name))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if len(data) == 0 {
+		return false, nil
+	}
+	k, err := s.key()
+	if err != nil {
+		return false, err
+	}
+	block, err := aes.NewCipher(k)
+	if err != nil {
+		return false, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return false, err
+	}
+	if len(data) < gcm.NonceSize() {
+		return false, errors.New("encrypted file too short")
+	}
+	nonce, ciphertext := data[:gcm.NonceSize()], data[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return false, err
+	}
+	if err := json.Unmarshal(plain, v); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // writeFileAtomic writes via a temp file + rename so a crash never leaves a
