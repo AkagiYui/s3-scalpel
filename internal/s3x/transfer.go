@@ -3,6 +3,7 @@ package s3x
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"mime"
 	"os"
@@ -263,4 +264,34 @@ func JoinKey(prefix, name string) string {
 		return name
 	}
 	return prefix + "/" + name
+}
+
+// ReadRange reads at most limit bytes from the start of an object with a single
+// ranged GET, reporting whether the object continues past the limit. It is what
+// makes previewing a multi-gigabyte log file cost one bounded read rather than a
+// full download.
+func ReadRange(ctx context.Context, cl *s3.Client, bucket, key string, limit int64) ([]byte, bool, error) {
+	if limit <= 0 {
+		limit = 1 << 20
+	}
+	// Ask for one byte past the limit so a full read is distinguishable from a
+	// file that happens to be exactly `limit` bytes long.
+	out, err := cl.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Range:  aws.String(fmt.Sprintf("bytes=0-%d", limit)),
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = out.Body.Close() }()
+
+	data, err := io.ReadAll(io.LimitReader(out.Body, limit+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(data)) > limit {
+		return data[:limit], true, nil
+	}
+	return data, false, nil
 }

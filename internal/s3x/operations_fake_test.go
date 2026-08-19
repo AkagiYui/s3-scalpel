@@ -652,3 +652,94 @@ func TestUploadWorksAgainstPlainHTTPEndpoint(t *testing.T) {
 		t.Errorf("final progress = %d, want %d (the counter must track the transmitting pass)", last, len(payload))
 	}
 }
+
+func TestDeletePrefixUsesBatchDelete(t *testing.T) {
+	f := newFakeS3()
+	for i := range 5 {
+		f.put("p/"+string(rune('a'+i)), []byte("x"))
+	}
+	f.put("keep", []byte("x"))
+	cl := f.start(t)
+
+	if err := DeletePrefix(context.Background(), cl, "b", "p/"); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.keys(); len(got) != 1 || got[0] != "keep" {
+		t.Errorf("bucket holds %v, want [keep]", got)
+	}
+	if f.batchCalls != 1 {
+		t.Errorf("issued %d DeleteObjects requests, want 1 for 5 keys", f.batchCalls)
+	}
+}
+
+func TestDeletePrefixFallsBackWhenBatchIsRejected(t *testing.T) {
+	f := newFakeS3()
+	f.rejectBatch = true // a gateway that demands Content-MD5
+	for i := range 5 {
+		f.put("p/"+string(rune('a'+i)), []byte("x"))
+	}
+	f.put("keep", []byte("x"))
+	cl := f.start(t)
+
+	if err := DeletePrefix(context.Background(), cl, "b", "p/"); err != nil {
+		t.Fatalf("a rejected batch must fall back, not fail: %v", err)
+	}
+	if got := f.keys(); len(got) != 1 || got[0] != "keep" {
+		t.Errorf("bucket holds %v, want [keep]", got)
+	}
+}
+
+func TestDeleteKeysSplitsOversizedBatches(t *testing.T) {
+	f := newFakeS3()
+	keys := make([]string, 0, maxBatchDelete+7)
+	for i := range maxBatchDelete + 7 {
+		key := "bulk/" + itoa(i)
+		f.put(key, nil)
+		keys = append(keys, key)
+	}
+	cl := f.start(t)
+
+	if err := DeleteKeys(context.Background(), cl, "b", keys); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(f.keys()); got != 0 {
+		t.Errorf("%d objects survived, want 0", got)
+	}
+	if f.batchCalls != 2 {
+		t.Errorf("issued %d batches for %d keys, want 2", f.batchCalls, len(keys))
+	}
+}
+
+func TestReadRangeCapsAndReportsTruncation(t *testing.T) {
+	f := newFakeS3()
+	f.put("small.txt", []byte("hello"))
+	f.put("big.txt", bytes.Repeat([]byte("x"), 5000))
+	cl := f.start(t)
+	ctx := context.Background()
+
+	data, truncated, err := ReadRange(ctx, cl, "b", "small.txt", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" || truncated {
+		t.Errorf("small read = %q truncated=%v, want %q false", data, truncated, "hello")
+	}
+
+	data, truncated, err = ReadRange(ctx, cl, "b", "big.txt", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 1000 || !truncated {
+		t.Errorf("capped read = %d bytes truncated=%v, want 1000 true", len(data), truncated)
+	}
+
+	// An object exactly at the limit is complete, not truncated.
+	f.put("exact.txt", bytes.Repeat([]byte("y"), 1000))
+	data, truncated, err = ReadRange(ctx, cl, "b", "exact.txt", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 1000 || truncated {
+		t.Errorf("exact read = %d bytes truncated=%v, want 1000 false", len(data), truncated)
+	}
+}

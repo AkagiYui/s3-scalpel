@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"mime"
 	"os"
 	"path/filepath"
@@ -23,6 +22,13 @@ const previewURLExpiry = time.Hour
 type PreviewService struct{ core *Core }
 
 // GetPreview returns preview data for an object.
+//
+// Images and PDFs are downloaded to the cache directory and handed back as a
+// local URL rather than a base64 data: URL — inlining costs roughly 2.3x the
+// object size in live memory and blocks until the whole thing is encoded. Text
+// is read with a single ranged GET capped at the preview limit, so a huge log
+// file costs one bounded read and no temp file. Audio and video stream from a
+// presigned URL.
 func (s *PreviewService) GetPreview(connID, bucket, key string) (model.PreviewData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -43,6 +49,7 @@ func (s *PreviewService) GetPreview(connID, bucket, key string) (model.PreviewDa
 	}
 	kind := classify(ct, key)
 	out := model.PreviewData{Kind: kind, ContentType: ct, Size: props.Size}
+	limit := s.core.Settings().PreviewMaxSize
 
 	switch kind {
 	case model.PreviewMedia:
@@ -54,35 +61,39 @@ func (s *PreviewService) GetPreview(connID, bucket, key string) (model.PreviewDa
 		}
 		out.URL = url
 		return out, nil
+
 	case model.PreviewUnsupported:
+		return out, nil
+
+	case model.PreviewText:
+		// Reading only the first `limit` bytes means an oversized text file is
+		// still previewable — truncated — instead of refused outright.
+		data, truncated, err := s3x.ReadRange(ctx, cl, bucket, key, limit)
+		if err != nil {
+			return out, err
+		}
+		out.Text = string(data)
+		out.Truncated = truncated
 		return out, nil
 	}
 
-	limit := s.core.Settings().PreviewMaxSize
 	if props.Size > limit {
 		out.Kind = model.PreviewTooLarge
 		return out, nil
 	}
 
-	// Download to a temp file (honouring "download to temp dir before preview").
+	// Stage the object on disk and let the webview stream it from the app's own
+	// asset server. The file is deleted as soon as it has been fetched once.
 	tmpDir := filepath.Join(s.core.cacheDir, "preview")
-	_ = os.MkdirAll(tmpDir, 0o755)
-	tmp := filepath.Join(tmpDir, randID()+filepath.Ext(key))
+	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+		return out, err
+	}
+	token := randID()
+	tmp := filepath.Join(tmpDir, token+filepath.Ext(key))
 	if err := s3x.Download(ctx, cl, bucket, key, tmp, s3x.DownloadOptions{}, nil); err != nil {
 		return out, err
 	}
-	defer func() { _ = os.Remove(tmp) }()
-
-	data, err := os.ReadFile(tmp)
-	if err != nil {
-		return out, err
-	}
-	switch kind {
-	case model.PreviewText:
-		out.Text = string(data)
-	case model.PreviewImage, model.PreviewPDF:
-		out.DataURL = "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(data)
-	}
+	out.URL = s.core.previews.stage(token, tmp, ct)
 	return out, nil
 }
 

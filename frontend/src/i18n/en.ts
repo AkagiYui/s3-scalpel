@@ -343,6 +343,8 @@ export const en = {
     previewThis: "Preview",
   },
   preview: {
+    truncated:
+      "Only the beginning of this file is shown — raise the preview size limit in Settings to see more.",
     title: "Preview",
     unsupported: "Preview is not available for this file type.",
     tooLarge: "File is larger than the preview limit. Increase it in Settings.",

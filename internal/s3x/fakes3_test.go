@@ -34,6 +34,8 @@ type fakeS3 struct {
 	partPuts     int               // successful UploadPart calls served
 	rangeReqs    int               // number of ranged GETs served
 	listPageMax  int               // objects per ListObjectsV2 page (0 = unlimited)
+	rejectBatch  bool              // reject DeleteObjects, as some gateways do
+	batchCalls   int               // DeleteObjects requests served
 	deleted      []string          // keys deleted, in service order
 	nextUpload   int               // number of multipart uploads created
 	uploadKeys   map[string]string // uploadId -> object key
@@ -104,6 +106,8 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	switch {
+	case r.Method == http.MethodPost && q.Has("delete"):
+		f.deleteObjects(w, r)
 	case r.Method == http.MethodGet && q.Has("uploads"):
 		f.listMultipartUploads(w)
 	case r.Method == http.MethodGet && q.Has("uploadId"):
@@ -413,4 +417,38 @@ func (f *fakeS3) listParts(w http.ResponseWriter, q map[string][]string) {
 	}
 	w.Header().Set("Content-Type", "application/xml")
 	_ = xml.NewEncoder(w).Encode(res)
+}
+
+// deleteObjects answers POST /<bucket>?delete.
+func (f *fakeS3) deleteObjects(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	f.batchCalls++
+	reject := f.rejectBatch
+	f.mu.Unlock()
+	if reject {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`<Error><Code>MissingContentMD5</Code></Error>`))
+		return
+	}
+
+	var payload struct {
+		Objects []struct {
+			Key string `xml:"Key"`
+		} `xml:"Object"`
+	}
+	body, _ := io.ReadAll(r.Body)
+	if err := xml.Unmarshal(body, &payload); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	for _, o := range payload.Objects {
+		delete(f.objects, o.Key)
+		f.deleted = append(f.deleted, o.Key)
+	}
+	f.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/xml")
+	_, _ = w.Write([]byte(`<DeleteResult></DeleteResult>`))
 }

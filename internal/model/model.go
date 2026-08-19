@@ -194,9 +194,12 @@ type PreviewData struct {
 	Kind        PreviewKind `json:"kind"`
 	ContentType string      `json:"contentType"`
 	Size        int64       `json:"size"`
-	DataURL     string      `json:"dataUrl"` // image/pdf: data: URL
-	Text        string      `json:"text"`    // text: raw content
-	URL         string      `json:"url"`     // media: presigned URL
+	Text        string      `json:"text"` // text: content, possibly truncated
+	// URL is where the webview loads the preview from: a local /_preview/ URL
+	// for images and PDFs, a presigned remote URL for audio and video.
+	URL string `json:"url"`
+	// Truncated reports that a text preview stops at the size limit.
+	Truncated bool `json:"truncated"`
 }
 
 // TestResult is returned by a connection test.

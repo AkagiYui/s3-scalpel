@@ -7,8 +7,9 @@
       The webview only ever talks to the Go side; every S3 request is made by the
       backend, so the page needs no outbound origins of its own. The exception is
       media: audio and video previews stream straight from a presigned URL on an
-      arbitrary S3 endpoint, so media-src has to stay open. Image, PDF and text
-      previews arrive as data: URLs and need no network at all.
+      arbitrary S3 endpoint, so media-src has to stay open. Image and PDF
+      previews are served from the app's own asset server under /_preview/, which
+      is why 'self' is enough for img-src, frame-src and object-src.
     -->
     <meta
       http-equiv="Content-Security-Policy"
@@ -18,8 +19,8 @@
                img-src 'self' data: blob:;
                font-src 'self' data:;
                media-src 'self' blob: data: https: http:;
-               object-src 'self' data: blob:;
-               frame-src 'self' data: blob:;
+               object-src 'self' blob:;
+               frame-src 'self' blob:;
                connect-src 'self' wails: ws: wss:;
                worker-src 'self' blob:;
                base-uri 'self';

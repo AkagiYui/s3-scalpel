@@ -40,9 +40,10 @@ Bundle identifier: `com.akagiyui.s3_scalpel`
   parts alive forever; the bucket toolbar lists them with their size and lets you abort
   them in bulk.
 - **Object tools** — properties, presigned URLs (custom expiry), object tags, object
-  versions (when the bucket supports versioning), and previews for images, text and PDF
-  (downloaded to a temp dir) plus streamed audio/video via a presigned URL. Preview size
-  is capped (configurable).
+  versions (when the bucket supports versioning), and previews. Images and PDFs stream
+  from the app's own asset server rather than being inlined as base64; text is read with
+  one ranged GET capped at the preview limit, so a multi-gigabyte log previews its first
+  page instead of being refused; audio and video stream from a short-lived presigned URL.
 - **Settings** — appearance (language: 简体中文 / English, defaulting to the system locale;
   light/dark/system theme), notifications (system notification + sound toggles), transfer
   defaults, an About section, and import/export of all settings (optionally including

@@ -339,6 +339,7 @@ export const zh: Dict = {
     previewThis: "预览",
   },
   preview: {
+    truncated: "仅显示文件开头部分，可在设置中调高预览大小上限查看更多。",
     title: "预览",
     unsupported: "此文件类型不支持预览。",
     tooLarge: "文件超过预览大小限制。可在设置中调大。",

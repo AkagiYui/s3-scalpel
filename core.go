@@ -35,6 +35,7 @@ type Core struct {
 	queue    *queue.Manager
 	session  *session
 	ops      *opRegistry
+	previews *previewCache
 
 	app   *application.App
 	notif *notifications.NotificationService
@@ -65,6 +66,7 @@ func NewCore(dataDir, cacheDir, version, buildVer string, debug bool) (*Core, er
 		store:    st,
 		session:  newSession(st),
 		ops:      newOpRegistry(),
+		previews: newPreviewCache(),
 		cacheDir: cacheDir,
 		clients:  s3x.NewManager(),
 		version:  version,

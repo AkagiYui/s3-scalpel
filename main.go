@@ -65,6 +65,9 @@ func main() {
 		Services:    services,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
+			// Serves staged image/PDF previews from /_preview/, so they stream
+			// instead of being inlined as base64.
+			Middleware: core.previews.middleware,
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
@@ -72,6 +75,7 @@ func main() {
 		OnShutdown: func() {
 			core.queue.Flush()
 			core.session.saveNow()
+			core.previews.discardAll()
 		},
 	})
 

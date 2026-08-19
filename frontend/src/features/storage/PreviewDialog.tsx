@@ -50,18 +50,23 @@ export const PreviewDialog: Component<{
                 <Switch>
                   <Match when={d().kind === "image"}>
                     <img
-                      src={d().dataUrl}
+                      src={d().url}
                       alt=""
                       class="max-h-[70vh] max-w-full rounded object-contain"
                     />
                   </Match>
                   <Match when={d().kind === "text"}>
-                    <pre class="selectable max-h-[70vh] w-full overflow-auto rounded-md bg-muted/50 p-3 text-xs">
-                      {d().text}
-                    </pre>
+                    <div class="flex w-full flex-col gap-2">
+                      <pre class="selectable max-h-[70vh] w-full overflow-auto rounded-md bg-muted/50 p-3 text-xs">
+                        {d().text}
+                      </pre>
+                      <Show when={d().truncated}>
+                        <p class="text-xs text-amber-500">{t("preview.truncated")}</p>
+                      </Show>
+                    </div>
                   </Match>
                   <Match when={d().kind === "pdf"}>
-                    <iframe src={d().dataUrl} class="h-[72vh] w-full rounded border" title="pdf" />
+                    <iframe src={d().url} class="h-[72vh] w-full rounded border" title="pdf" />
                   </Match>
                   <Match when={d().kind === "media" && d().contentType.startsWith("video")}>
                     <video src={d().url} controls class="max-h-[70vh] max-w-full rounded" />

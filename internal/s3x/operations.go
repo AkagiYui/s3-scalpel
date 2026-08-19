@@ -3,6 +3,7 @@ package s3x
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -285,13 +286,16 @@ func DeleteObject(ctx context.Context, cl *s3.Client, bucket, key, versionID str
 	return err
 }
 
+// maxBatchDelete is the DeleteObjects limit S3 imposes per request.
+const maxBatchDelete = 1000
+
 // DeletePrefix removes every object under a prefix (used to delete a folder).
 //
-// It deletes objects individually with bounded concurrency rather than via the
-// batch DeleteObjects API: that API requires a Content-MD5 header which several
-// S3-compatible gateways enforce but the SDK omits once default checksums are
-// disabled (needed for broad upload compatibility). Single DeleteObject calls
-// are portable everywhere.
+// It tries the batch DeleteObjects API first — one request per 1000 keys instead
+// of one per key — and falls back to individual deletes for a batch the endpoint
+// rejects. The fallback exists because several S3-compatible gateways enforce a
+// Content-MD5 header on DeleteObjects that not every client sends; single
+// DeleteObject calls are portable everywhere, just far slower.
 func DeletePrefix(ctx context.Context, cl *s3.Client, bucket, prefix string) error {
 	entries, err := ListAllObjects(ctx, cl, bucket, prefix)
 	if err != nil {
@@ -302,6 +306,58 @@ func DeletePrefix(ctx context.Context, cl *s3.Client, bucket, prefix string) err
 		return DeleteObject(ctx, cl, bucket, prefix, "")
 	}
 
+	keys := make([]string, 0, len(entries))
+	for _, e := range entries {
+		keys = append(keys, e.Key)
+	}
+	return DeleteKeys(ctx, cl, bucket, keys)
+}
+
+// DeleteKeys removes the given keys, batching where the endpoint supports it.
+func DeleteKeys(ctx context.Context, cl *s3.Client, bucket string, keys []string) error {
+	for start := 0; start < len(keys); start += maxBatchDelete {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		end := min(start+maxBatchDelete, len(keys))
+		batch := keys[start:end]
+
+		if err := deleteBatch(ctx, cl, bucket, batch); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			// The endpoint would not take the batch; delete these one by one.
+			if err := deleteIndividually(ctx, cl, bucket, batch); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// deleteBatch issues a single DeleteObjects request, treating a per-key error in
+// the response as a failure of the whole batch so the caller retries it singly.
+func deleteBatch(ctx context.Context, cl *s3.Client, bucket string, keys []string) error {
+	objects := make([]types.ObjectIdentifier, 0, len(keys))
+	for _, k := range keys {
+		objects = append(objects, types.ObjectIdentifier{Key: aws.String(k)})
+	}
+	out, err := cl.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: aws.String(bucket),
+		Delete: &types.Delete{Objects: objects, Quiet: aws.Bool(true)},
+	})
+	if err != nil {
+		return err
+	}
+	if len(out.Errors) > 0 {
+		first := out.Errors[0]
+		return fmt.Errorf("delete %s: %s", aws.ToString(first.Key), aws.ToString(first.Message))
+	}
+	return nil
+}
+
+// deleteIndividually removes keys one at a time with bounded concurrency.
+func deleteIndividually(ctx context.Context, cl *s3.Client, bucket string, keys []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	sem := make(chan struct{}, 8)
@@ -309,7 +365,7 @@ func DeletePrefix(ctx context.Context, cl *s3.Client, bucket, prefix string) err
 	var mu sync.Mutex
 	var firstErr error
 
-	for _, e := range entries {
+	for _, key := range keys {
 		if ctx.Err() != nil {
 			break
 		}
@@ -326,7 +382,7 @@ func DeletePrefix(ctx context.Context, cl *s3.Client, bucket, prefix string) err
 				}
 				mu.Unlock()
 			}
-		}(e.Key)
+		}(key)
 	}
 	wg.Wait()
 	return firstErr
