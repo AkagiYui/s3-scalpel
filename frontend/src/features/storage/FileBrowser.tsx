@@ -36,6 +36,9 @@ import {
   X as XIcon,
   Boxes,
   PenLine,
+  ClipboardCopy,
+  Star,
+  BookMarked,
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
@@ -90,6 +93,7 @@ import { toast } from "~/components/ui/toast";
 import { cn } from "~/lib/utils";
 import * as bus from "~/lib/bus";
 import { createVirtualizer } from "@tanstack/solid-virtual";
+import { bookmarks, addBookmark, removeBookmark, findBookmark } from "~/stores/bookmarks";
 import { createCancellableOp } from "~/lib/operation";
 import { t } from "~/i18n";
 
@@ -133,6 +137,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [deleteKeys, setDeleteKeys] = createSignal<string[] | null>(null);
   const [capsOpen, setCapsOpen] = createSignal(false);
   const [renameEntry, setRenameEntry] = createSignal<ObjectEntry | null>(null);
+  const [batchTagKeys, setBatchTagKeys] = createSignal<string[] | null>(null);
   const [multipartOpen, setMultipartOpen] = createSignal(false);
 
   const bucket = () => props.tab.bucket!;
@@ -503,6 +508,42 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
 
   const selectedKeys = () => Array.from(selected());
 
+  /** Copy text through the native clipboard and confirm it visibly. */
+  const copy = async (text: string) => {
+    try {
+      await AppService.CopyToClipboard(text);
+      toast.success(t("storage.copied"));
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    }
+  };
+
+  /* ------------------------------- bookmarks ------------------------------- */
+
+  const currentBookmark = () => findBookmark(props.tab.connectionId, bucket(), prefix());
+
+  const toggleBookmark = async () => {
+    try {
+      const existing = currentBookmark();
+      if (existing) {
+        await removeBookmark(existing.id);
+        return;
+      }
+      await addBookmark({
+        connectionId: props.tab.connectionId,
+        bucket: bucket(),
+        prefix: prefix(),
+        label: "",
+      });
+      toast.success(t("storage.bookmarkAdded"));
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    }
+  };
+
+  /** Bookmarks that belong to the connection this tab is browsing. */
+  const tabBookmarks = () => bookmarks().filter((b) => b.connectionId === props.tab.connectionId);
+
   // Row action menu items, reused by the kebab dropdown and the context menu.
   const RowActions: Component<{ entry: ObjectEntry; Item: any; Separator: any }> = (p) => (
     <>
@@ -538,6 +579,14 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
           {t("storage.versions")}
         </p.Item>
       </Show>
+      <p.Item onSelect={() => copy(p.entry.key)}>
+        <ClipboardCopy class="h-4 w-4" />
+        {t("storage.copyKey")}
+      </p.Item>
+      <p.Item onSelect={() => copy(`s3://${bucket()}/${p.entry.key}`)}>
+        <ClipboardCopy class="h-4 w-4" />
+        {t("storage.copyUri")}
+      </p.Item>
       <p.Separator />
       <p.Item onSelect={() => setRenameEntry(p.entry)}>
         <PenLine class="h-4 w-4" />
@@ -693,6 +742,46 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
           >
             <Boxes class="h-3.5 w-3.5" />
           </Button>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={toggleBookmark}
+            title={currentBookmark() ? t("storage.bookmarkRemove") : t("storage.bookmarkAdd")}
+          >
+            <Star class={cn("h-3.5 w-3.5", currentBookmark() && "fill-current text-amber-500")} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              class={cn(buttonVariants({ size: "icon-sm", variant: "outline" }))}
+              title={t("storage.bookmarks")}
+            >
+              <BookMarked class="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <Show
+                when={tabBookmarks().length}
+                fallback={
+                  <div class="px-2 py-3 text-center text-xs text-muted-foreground">
+                    {t("storage.bookmarkEmpty")}
+                  </div>
+                }
+              >
+                <For each={tabBookmarks()}>
+                  {(b) => (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        if (b.bucket !== bucket()) openBucket(props.tab.id, b.bucket);
+                        navigatePrefix(props.tab.id, b.prefix);
+                      }}
+                    >
+                      <BookMarked class="h-4 w-4" />
+                      <span class="truncate">{b.label}</span>
+                    </DropdownMenuItem>
+                  )}
+                </For>
+              </Show>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={() => setNewFolderOpen(true)}>
             <FolderPlus class="h-3.5 w-3.5" />
             {t("storage.newFolder")}
@@ -744,6 +833,10 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
             <Button size="sm" variant="outline" onClick={() => setDownloadKeys(selectedKeys())}>
               <Download class="h-3.5 w-3.5" />
               {t("common.download")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setBatchTagKeys(selectedKeys())}>
+              <TagIcon class="h-3.5 w-3.5" />
+              {t("storage.tagSelected")}
             </Button>
             <Button
               size="sm"
@@ -1042,6 +1135,17 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
             initial={keyBasename(entry().key)}
             confirmText={t("common.rename")}
             onSubmit={doRename}
+          />
+        )}
+      </Show>
+      <Show when={batchTagKeys()}>
+        {(keys) => (
+          <TagsDialog
+            open
+            onOpenChange={(o) => !o && setBatchTagKeys(null)}
+            connId={props.tab.connectionId}
+            bucket={bucket()}
+            objKeys={keys()}
           />
         )}
       </Show>

@@ -64,6 +64,16 @@ func (s *AppService) SaveSession(windowID string, tabs []model.TabSession) {
 	s.core.session.setTabs(windowID, tabs)
 }
 
+// CopyToClipboard puts text on the system clipboard. It goes through the native
+// clipboard rather than the webview's, which needs a user-gesture context the
+// app does not always have when copying from a menu item.
+func (s *AppService) CopyToClipboard(text string) bool {
+	if s.core.app == nil {
+		return false
+	}
+	return s.core.app.Clipboard.SetText(text)
+}
+
 // OpenURL opens a URL (or mailto:) in the default handler.
 func (s *AppService) OpenURL(url string) error {
 	if s.core.app == nil {

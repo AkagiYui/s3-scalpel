@@ -39,7 +39,10 @@ Bundle identifier: `com.akagiyui.s3_scalpel`
 - **Incomplete uploads** — multipart uploads that were never finished keep billable
   parts alive forever; the bucket toolbar lists them with their size and lets you abort
   them in bulk.
-- **Object tools** — properties, presigned URLs (custom expiry), object tags, object
+- **Bookmarks** — star a bucket or a folder and jump straight back to it from the
+  toolbar; the list is shared across windows and survives restarts.
+- **Object tools** — properties, presigned URLs (custom expiry), object tags (single or
+  applied across a whole selection), copy key / `s3://` URI to the clipboard, object
   versions (when the bucket supports versioning), and previews. Images and PDFs stream
   from the app's own asset server rather than being inlined as base64; text is read with
   one ranged GET capped at the preview limit, so a multi-gigabyte log previews its first

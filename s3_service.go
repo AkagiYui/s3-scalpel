@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"s3scalpel/internal/model"
@@ -149,6 +150,37 @@ func (s *S3Service) PutTags(connID, bucket, key string, tags []model.Tag) error 
 		return err
 	}
 	return s3x.PutTags(ctx, cl, bucket, key, tags)
+}
+
+// PutTagsBatch replaces the tag set on several objects at once, reporting how
+// many were updated. Tagging a selection one dialog at a time is the kind of
+// chore a client should absorb; a failure on one key does not stop the rest.
+func (s *S3Service) PutTagsBatch(connID, bucket string, keys []string, tags []model.Tag) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return 0, err
+	}
+
+	done := 0
+	var firstErr error
+	for _, key := range keys {
+		if err := ctx.Err(); err != nil {
+			return done, err
+		}
+		if strings.HasSuffix(key, "/") {
+			continue // folders are prefixes, not taggable objects
+		}
+		if err := s3x.PutTags(ctx, cl, bucket, key, tags); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		done++
+	}
+	return done, firstErr
 }
 
 // VersioningEnabled reports whether a bucket has versioning enabled.

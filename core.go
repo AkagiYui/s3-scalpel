@@ -46,6 +46,9 @@ type Core struct {
 	connMu sync.RWMutex
 	conns  []model.Connection
 
+	bookmarkMu sync.RWMutex
+	bookmarks  []model.Bookmark
+
 	version  string
 	buildVer string
 	debug    bool
@@ -77,6 +80,7 @@ func NewCore(dataDir, cacheDir, version, buildVer string, debug bool) (*Core, er
 	}
 	c.loadSettings()
 	c.loadConnections()
+	c.loadBookmarks()
 
 	c.queue = queue.NewManager(st, queue.Deps{
 		GetConnection: c.getConnection,
@@ -204,6 +208,13 @@ func (c *Core) saveConnections() error {
 	copy(conns, c.conns)
 	c.connMu.RUnlock()
 	return c.store.WriteEncrypted(connsFile, conns)
+}
+
+func (c *Core) loadBookmarks() {
+	var list []model.Bookmark
+	if ok, err := c.store.ReadJSON(bookmarksFile, &list); err == nil && ok {
+		c.bookmarks = list
+	}
 }
 
 func (c *Core) getConnection(id string) (model.Connection, bool) {

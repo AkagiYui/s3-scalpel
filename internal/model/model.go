@@ -250,3 +250,14 @@ type ImportProbe struct {
 	Path      string `json:"path"`
 	Encrypted bool   `json:"encrypted"`
 }
+
+// Bookmark is a saved location inside a connection: a bucket, optionally a
+// prefix within it, under a user-chosen label.
+type Bookmark struct {
+	ID           string `json:"id"`
+	ConnectionID string `json:"connectionId"`
+	Label        string `json:"label"`
+	Bucket       string `json:"bucket"`
+	Prefix       string `json:"prefix"`
+	CreatedAt    int64  `json:"createdAt"`
+}

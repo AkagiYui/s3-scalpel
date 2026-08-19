@@ -7,6 +7,7 @@ import { loadSettings } from "~/stores/settings";
 import { loadConnections } from "~/stores/connections";
 import { initQueue } from "~/stores/tasks";
 import { restoreTabs, persistTabs } from "~/stores/tabs";
+import { loadBookmarks } from "~/stores/bookmarks";
 import { windowID, onEvent } from "~/lib/api";
 import { refreshPlatform } from "~/lib/platform";
 import * as bus from "~/lib/bus";
@@ -19,6 +20,7 @@ export const App: Component<RouteSectionProps> = (props) => {
     refreshPlatform();
     loadSettings();
     loadConnections();
+    loadBookmarks();
     initQueue();
     // Mirroring is wired up first (inside the component's reactive owner) and
     // stays inert until the restore flips its ready flag.

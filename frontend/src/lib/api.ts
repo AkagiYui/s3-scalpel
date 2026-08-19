@@ -9,6 +9,7 @@ export {
   QueueService,
   SettingsService,
   PreviewService,
+  BookmarkService,
 } from "../../bindings/s3scalpel";
 
 export { AppInfo } from "../../bindings/s3scalpel/models";
@@ -42,6 +43,7 @@ import {
   WindowSession,
   WindowBounds,
   ImportProbe,
+  Bookmark,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -73,6 +75,7 @@ export {
   WindowSession,
   WindowBounds,
   ImportProbe,
+  Bookmark,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */

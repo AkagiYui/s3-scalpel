@@ -1,6 +1,12 @@
 import { createSignal, createEffect, For, Show, type Component } from "solid-js";
 import { Plus, Trash2 } from "lucide-solid";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
 import { DialogFooter } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Input, Spinner } from "~/components/ui/primitives";
@@ -8,12 +14,20 @@ import { S3Service, type Tag } from "~/lib/api";
 import { toast } from "~/components/ui/toast";
 import { t } from "~/i18n";
 
+/**
+ * Edits the tag set of one object, or replaces it across a whole selection.
+ * In batch mode there is no existing set to load — several objects rarely share
+ * one — so the editor starts empty and what is saved becomes the new set.
+ */
 export const TagsDialog: Component<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connId: string;
   bucket: string;
-  objKey: string;
+  /** Single-object mode. */
+  objKey?: string;
+  /** Batch mode: replace the tag set on all of these keys. */
+  objKeys?: string[];
 }> = (props) => {
   const [tags, setTags] = createSignal<Tag[]>([]);
   const [loading, setLoading] = createSignal(false);
@@ -23,10 +37,17 @@ export const TagsDialog: Component<{
     if (props.open) load();
   });
 
+  const batchKeys = () => props.objKeys ?? [];
+  const isBatch = () => batchKeys().length > 0;
+
   const load = async () => {
+    if (isBatch()) {
+      setTags([{ key: "", value: "" } as Tag]);
+      return;
+    }
     setLoading(true);
     try {
-      const result = await S3Service.GetTags(props.connId, props.bucket, props.objKey);
+      const result = await S3Service.GetTags(props.connId, props.bucket, props.objKey!);
       setTags((result ?? []).map((x) => ({ key: x.key, value: x.value }) as Tag));
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
@@ -44,8 +65,13 @@ export const TagsDialog: Component<{
     setSaving(true);
     try {
       const clean = tags().filter((tg) => tg.key.trim());
-      await S3Service.PutTags(props.connId, props.bucket, props.objKey, clean);
-      toast.success(t("tags.saved"));
+      if (isBatch()) {
+        const n = await S3Service.PutTagsBatch(props.connId, props.bucket, batchKeys(), clean);
+        toast.success(t("tags.batchSaved", { count: n }));
+      } else {
+        await S3Service.PutTags(props.connId, props.bucket, props.objKey!, clean);
+        toast.success(t("tags.saved"));
+      }
       props.onOpenChange(false);
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
@@ -58,7 +84,12 @@ export const TagsDialog: Component<{
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>{t("tags.title")}</DialogTitle>
+          <DialogTitle>
+            {isBatch() ? t("tags.batchTitle", { count: batchKeys().length }) : t("tags.title")}
+          </DialogTitle>
+          <Show when={isBatch()}>
+            <DialogDescription>{t("tags.batchHint")}</DialogDescription>
+          </Show>
         </DialogHeader>
         <Show
           when={!loading()}
