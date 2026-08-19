@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type Component } from "solid-js";
+import { createSignal, onMount, onCleanup, For, Show, type Component } from "solid-js";
 import {
   ChevronUp,
   ChevronDown,
@@ -51,20 +51,28 @@ const statusVariant = (
     case "running":
       return "default";
     case "canceled":
+    case "skipped":
       return "warning";
     default:
       return "secondary";
   }
 };
 
-const TaskRow: Component<{ task: Task }> = (props) => {
+/** Seconds left before an automatically retried task runs again (0 when none). */
+const retryCountdown = (task: Task, now: number) =>
+  task.status === "pending" && task.nextAttemptAt > now
+    ? Math.ceil((task.nextAttemptAt - now) / 1000)
+    : 0;
+
+const TaskRow: Component<{ task: Task; now: number }> = (props) => {
   const Icon = typeIcon(props.task.type);
   const pct = () =>
     props.task.size > 0 ? Math.round((props.task.transferred / props.task.size) * 100) : 0;
   const finished = () =>
     props.task.status === "completed" ||
     props.task.status === "failed" ||
-    props.task.status === "canceled";
+    props.task.status === "canceled" ||
+    props.task.status === "skipped";
   const name = () =>
     props.task.type === "copy" || props.task.type === "move"
       ? keyBasename(props.task.destKey || props.task.key)
@@ -98,6 +106,13 @@ const TaskRow: Component<{ task: Task }> = (props) => {
             {props.task.error}
           </div>
         </Show>
+        <Show when={retryCountdown(props.task, props.now)}>
+          {(seconds) => (
+            <div class="mt-0.5 truncate text-xs text-amber-500" title={props.task.error}>
+              {t("queue.retryIn", { seconds: seconds() })}
+            </div>
+          )}
+        </Show>
         <Show when={props.task.status === "running" && props.task.size === 0}>
           <div class="mt-1">
             <Progress indeterminate value={100} class="h-1.5" />
@@ -117,7 +132,13 @@ const TaskRow: Component<{ task: Task }> = (props) => {
             </Button>
           </Tooltip>
         </Show>
-        <Show when={props.task.status === "failed" || props.task.status === "canceled"}>
+        <Show
+          when={
+            props.task.status === "failed" ||
+            props.task.status === "canceled" ||
+            props.task.status === "skipped"
+          }
+        >
           <Tooltip label={t("common.retry")}>
             <Button size="icon-sm" variant="ghost" onClick={() => queue.retry(props.task.id)}>
               <RotateCcw class="h-3.5 w-3.5" />
@@ -143,6 +164,13 @@ const TaskRow: Component<{ task: Task }> = (props) => {
 
 export const TaskPanel: Component = () => {
   const [expanded, setExpanded] = createSignal(false);
+
+  // A ticking clock so retry countdowns update without a backend event.
+  const [now, setNow] = createSignal(Date.now());
+  onMount(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    onCleanup(() => clearInterval(timer));
+  });
 
   return (
     <div class="shrink-0 border-t bg-card">
@@ -220,7 +248,7 @@ export const TaskPanel: Component = () => {
               <div class="py-8 text-center text-sm text-muted-foreground">{t("queue.noTasks")}</div>
             }
           >
-            <For each={tasks()}>{(task) => <TaskRow task={task} />}</For>
+            <For each={tasks()}>{(task) => <TaskRow task={task} now={now()} />}</For>
           </Show>
         </div>
       </Show>

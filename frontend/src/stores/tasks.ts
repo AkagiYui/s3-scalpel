@@ -66,3 +66,6 @@ export function pendingCount(): number {
 export function failedCount(): number {
   return tasks().filter((t) => t.status === "failed").length;
 }
+export function skippedCount(): number {
+  return tasks().filter((t) => t.status === "skipped").length;
+}

@@ -20,6 +20,13 @@ type UploadOptions struct {
 	KMSKeyID        string
 	ACL             string // canned ACL, e.g. "private", "public-read"
 	PartConcurrency int    // concurrent parts for multipart upload (0 = default)
+
+	// ResumeUploadID continues a previously started multipart upload instead of
+	// beginning a new one; unknown or already-aborted ids fall back to a fresh
+	// upload. OnUploadID reports the id in use so the caller can persist it for
+	// the next attempt and abort it when it finally gives up.
+	ResumeUploadID string
+	OnUploadID     func(uploadID string)
 }
 
 func (o UploadOptions) applyPut(in *s3.PutObjectInput) {

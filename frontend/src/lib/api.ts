@@ -37,6 +37,7 @@ import {
   PrefixStats,
   StorageClassStat,
   SearchResult,
+  MultipartUpload,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -63,6 +64,7 @@ export {
   PrefixStats,
   StorageClassStat,
   SearchResult,
+  MultipartUpload,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */

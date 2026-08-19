@@ -89,7 +89,19 @@ export const en = {
     openInNewTab: "Open in storage",
     created: "Added {{ date }}",
   },
+  multipart: {
+    title: "Incomplete uploads",
+    description:
+      "Multipart uploads that were started but never finished. Their parts still occupy storage — and are still billed — until they are aborted.",
+    empty: "No incomplete uploads in this bucket.",
+    parts: "Parts",
+    initiated: "Started",
+    abortSelected: "Abort selected",
+    aborted: "Aborted {{count}} upload(s)",
+    selectedSummary: "{{count}} selected, reclaiming {{size}}",
+  },
   storage: {
+    multipartCleanup: "Incomplete uploads",
     pickConnection: "Select a connection",
     pickConnectionHint: "Choose a connection to open a session tab.",
     noTabs: "No open sessions. Open a connection to begin.",
@@ -152,6 +164,8 @@ export const en = {
     sortBy: "Sort by",
   },
   queue: {
+    retryIn: "retrying in {{seconds}}s",
+    skipped: "skipped",
     title: "Operation Queue",
     show: "Show queue",
     hide: "Hide queue",
@@ -169,6 +183,7 @@ export const en = {
     cancel: "Cancel",
     remove: "Remove",
     status: {
+      skipped: "Skipped",
       pending: "Pending",
       running: "Running",
       completed: "Completed",
@@ -184,6 +199,14 @@ export const en = {
     },
   },
   settings: {
+    conflictPolicy: "When the destination exists",
+    conflictOverwrite: "Overwrite",
+    conflictSkip: "Skip",
+    conflictRename: "Keep both",
+    conflictPolicyHint: "Applies to uploads, downloads, copies and moves.",
+    maxAutoRetries: "Automatic retries",
+    maxAutoRetriesHint:
+      "Transient failures are retried with a growing delay (1s, 2s, 4s…). 0 disables it.",
     title: "Settings",
     appearance: "Appearance",
     appearanceDesc: "Language and color theme.",

@@ -23,6 +23,7 @@ const (
 
 	maxConcurrency     = 32
 	maxPartConcurrency = 16
+	maxAutoRetries     = 10
 )
 
 // Core holds all shared backend state. A single instance is shared by every
@@ -93,6 +94,8 @@ func defaultSettings() model.AppSettings {
 		MultipartEnabled: true,
 		AutoConsumeQueue: true,
 		PreviewMaxSize:   10 * 1024 * 1024,
+		MaxAutoRetries:   3,
+		ConflictPolicy:   model.ConflictOverwrite,
 	}
 }
 
@@ -136,6 +139,17 @@ func normalizeSettings(s model.AppSettings) model.AppSettings {
 	}
 	if s.PartConcurrency > maxPartConcurrency {
 		s.PartConcurrency = maxPartConcurrency
+	}
+	if s.MaxAutoRetries < 0 {
+		s.MaxAutoRetries = 0
+	}
+	if s.MaxAutoRetries > maxAutoRetries {
+		s.MaxAutoRetries = maxAutoRetries
+	}
+	switch s.ConflictPolicy {
+	case model.ConflictOverwrite, model.ConflictSkip, model.ConflictRename:
+	default:
+		s.ConflictPolicy = d.ConflictPolicy
 	}
 	return s
 }

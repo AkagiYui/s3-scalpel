@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"s3scalpel/internal/model"
+	"s3scalpel/internal/s3x"
 	"s3scalpel/internal/store"
 )
 
@@ -248,10 +249,15 @@ func (q *windowQueue) pickNext() *model.Task {
 	if !q.autoConsume && !q.drain {
 		return nil
 	}
+	now := time.Now().UnixMilli()
 	var best *model.Task
 	for _, id := range q.order {
 		t := q.tasks[id]
 		if t == nil || t.Status != model.StatusPending {
+			continue
+		}
+		// A task waiting out its retry backoff stays pending but is not runnable.
+		if t.NextAttemptAt > now {
 			continue
 		}
 		if best == nil || t.Priority > best.Priority {
@@ -259,16 +265,28 @@ func (q *windowQueue) pickNext() *model.Task {
 		}
 	}
 	if best == nil {
-		// nothing pending: clear a one-shot drain once everything settles.
-		if q.drain && len(q.active) == 0 {
+		// nothing runnable: clear a one-shot drain once everything settles.
+		if q.drain && len(q.active) == 0 && !q.hasPendingLocked() {
 			q.drain = false
 		}
 		return nil
 	}
 	best.Status = model.StatusRunning
 	best.Error = ""
-	best.UpdatedAt = time.Now().UnixMilli()
+	best.NextAttemptAt = 0
+	best.UpdatedAt = now
 	return best
+}
+
+// hasPendingLocked reports whether any task is still waiting to run, including
+// ones counting down a retry backoff. Callers must hold q.mu.
+func (q *windowQueue) hasPendingLocked() bool {
+	for _, t := range q.tasks {
+		if t != nil && t.Status == model.StatusPending {
+			return true
+		}
+	}
+	return false
 }
 
 // classify maps an execution result onto a terminal task status. Cancellation is
@@ -278,11 +296,56 @@ func classify(err error) model.TaskStatus {
 	switch {
 	case err == nil:
 		return model.StatusCompleted
+	case errors.Is(err, errSkipped):
+		return model.StatusSkipped
 	case errors.Is(err, context.Canceled):
 		return model.StatusCanceled
 	default:
 		return model.StatusFailed
 	}
+}
+
+// backoff returns the delay before retry attempt n (1-based): 1s, 2s, 4s, ...
+// capped at 30s.
+func backoff(attempt int) time.Duration {
+	const (
+		base = time.Second
+		max  = 30 * time.Second
+	)
+	d := base << min(attempt-1, 16)
+	if d > max || d <= 0 {
+		return max
+	}
+	return d
+}
+
+// abortDanglingUpload discards the multipart upload a task was holding open.
+// Called when a task reaches a terminal state other than success.
+func (q *windowQueue) abortDanglingUpload(t *model.Task) {
+	if t.UploadID == "" || t.Type != model.TaskUpload {
+		return
+	}
+	key := t.ResolvedKey
+	if key == "" {
+		key = t.Key
+	}
+	conn, ok := q.mgr.deps.GetConnection(t.ConnectionID)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl, err := q.mgr.deps.GetClient(ctx, conn)
+	if err != nil {
+		return
+	}
+	_ = s3x.AbortUpload(ctx, cl, t.Bucket, key, t.UploadID)
+
+	q.mu.Lock()
+	if live := q.tasks[t.ID]; live != nil {
+		live.UploadID = ""
+	}
+	q.mu.Unlock()
 }
 
 // run executes a task in its own goroutine.
@@ -299,14 +362,36 @@ func (q *windowQueue) run(t *model.Task) {
 		q.mu.Lock()
 		delete(q.active, t.ID)
 		t.UpdatedAt = time.Now().UnixMilli()
-		t.Status = classify(err)
-		switch t.Status {
-		case model.StatusCompleted:
+		status := classify(err)
+		maxRetries := q.mgr.deps.Settings().MaxAutoRetries
+
+		// A transient failure goes back to pending with an exponential backoff
+		// rather than landing in front of the user as a permanent error.
+		retrying := status == model.StatusFailed &&
+			t.Retries < maxRetries &&
+			s3x.IsRetriable(err)
+
+		switch {
+		case retrying:
+			t.Status = model.StatusPending
+			t.Retries++
+			t.Transferred = 0
+			t.Error = err.Error()
+			t.NextAttemptAt = time.Now().Add(backoff(t.Retries)).UnixMilli()
+		case status == model.StatusCompleted:
+			t.Status = status
 			t.Transferred = t.Size
 			t.Error = ""
-		case model.StatusCanceled:
+			t.UploadID = ""
+		case status == model.StatusSkipped:
+			t.Status = status
+			t.Error = ""
+			t.UploadID = ""
+		case status == model.StatusCanceled:
+			t.Status = status
 			t.Error = ""
 		default:
+			t.Status = status
 			t.Error = err.Error()
 		}
 		// Snapshot the finished task so everything below reads a stable copy
@@ -314,7 +399,16 @@ func (q *windowQueue) run(t *model.Task) {
 		done := *t
 		q.mu.Unlock()
 
-		q.mgr.notify(done.Status, string(done.Type), done.Key)
+		if retrying {
+			// Wake the scheduler once the backoff elapses; nothing else will.
+			time.AfterFunc(time.Until(time.UnixMilli(done.NextAttemptAt)), q.signal)
+		} else {
+			// Giving up (or being cancelled) means the multipart upload this
+			// task was holding open must be discarded, or its parts stay
+			// billable forever.
+			q.abortDanglingUpload(&done)
+			q.mgr.notify(done.Status, string(done.Type), done.Key)
+		}
 		q.mgr.emitTasks(q.windowID)
 		q.mgr.scheduleSave()
 		if done.Status == model.StatusCompleted {
@@ -400,10 +494,11 @@ func (m *Manager) Start(windowID string) {
 func (m *Manager) Retry(windowID, taskID string) {
 	q := m.queueFor(windowID)
 	q.mu.Lock()
-	if t := q.tasks[taskID]; t != nil && (t.Status == model.StatusFailed || t.Status == model.StatusCanceled) {
+	if t := q.tasks[taskID]; t != nil && isRetryable(t.Status) {
 		t.Status = model.StatusPending
 		t.Error = ""
 		t.Transferred = 0
+		t.NextAttemptAt = 0
 		t.Retries++
 		t.UpdatedAt = time.Now().UnixMilli()
 	}
@@ -419,10 +514,11 @@ func (m *Manager) RetryAllFailed(windowID string) {
 	q.mu.Lock()
 	for _, id := range q.order {
 		t := q.tasks[id]
-		if t != nil && (t.Status == model.StatusFailed || t.Status == model.StatusCanceled) {
+		if t != nil && isRetryable(t.Status) {
 			t.Status = model.StatusPending
 			t.Error = ""
 			t.Transferred = 0
+			t.NextAttemptAt = 0
 			t.Retries++
 		}
 	}
@@ -430,6 +526,16 @@ func (m *Manager) RetryAllFailed(windowID string) {
 	q.signal()
 	m.emitTasks(windowID)
 	m.scheduleSave()
+}
+
+// isRetryable reports whether a task in this state can be re-queued by hand.
+func isRetryable(status model.TaskStatus) bool {
+	switch status {
+	case model.StatusFailed, model.StatusCanceled, model.StatusSkipped:
+		return true
+	default:
+		return false
+	}
 }
 
 // Cancel stops a running task or removes a pending one.

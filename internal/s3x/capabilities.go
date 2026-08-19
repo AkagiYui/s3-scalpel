@@ -113,3 +113,41 @@ func CheckCapabilities(ctx context.Context, cl *s3.Client, bucket string) []mode
 
 	return caps
 }
+
+// IsRetriable reports whether an error is worth trying again. Cancellation never
+// is; neither is a client error the server will keep rejecting (a missing
+// bucket, a denied key, a malformed request). Throttling, request timeouts,
+// server errors and transport failures are all transient.
+func IsRetriable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var re *smithyhttp.ResponseError
+	if errors.As(err, &re) {
+		switch code := re.HTTPStatusCode(); {
+		case code == 408 || code == 429:
+			return true
+		case code >= 400 && code < 500:
+			return false
+		default:
+			return true
+		}
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.ErrorCode() {
+		case "RequestTimeout", "RequestTimeTooSkewed", "SlowDown", "Throttling",
+			"ThrottlingException", "InternalError", "ServiceUnavailable", "PriorRequestNotComplete":
+			return true
+		}
+		return apiErr.ErrorFault() == smithy.FaultServer
+	}
+	// Transport-level failures (connection reset, DNS, TLS handshake) reach here.
+	return true
+}

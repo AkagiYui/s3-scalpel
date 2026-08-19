@@ -201,30 +201,207 @@ func TestMultipartUploadAssemblesPartsInOrder(t *testing.T) {
 	}
 }
 
-func TestMultipartUploadAbortsOnPartFailure(t *testing.T) {
+func TestMultipartUploadLeavesUploadResumableOnFailure(t *testing.T) {
 	f := newFakeS3()
 	cl := f.start(t)
-	f.failPart = 100 // every UploadPart fails
+	f.failAllParts = true
 
 	payload := make([]byte, 2*MinPartSize)
-	dir := t.TempDir()
-	local := filepath.Join(dir, "flaky.bin")
+	local := filepath.Join(t.TempDir(), "flaky.bin")
 	if err := os.WriteFile(local, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	err := Upload(context.Background(), cl, "b", "flaky.bin", local, true, MinPartSize, UploadOptions{}, nil)
+	var reportedID string
+	err := Upload(context.Background(), cl, "b", "flaky.bin", local, true, MinPartSize,
+		UploadOptions{OnUploadID: func(id string) { reportedID = id }}, nil)
 	if err == nil {
 		t.Fatal("expected the upload to fail")
 	}
 	if _, ok := f.get("flaky.bin"); ok {
 		t.Error("a failed multipart upload must not leave a partial object behind")
 	}
+	if reportedID == "" {
+		t.Fatal("the upload id must be reported so the caller can resume or abort it")
+	}
+	// The contract is deliberately "leave it open": the caller decides between
+	// resuming and aborting, and aborting here would make resume impossible.
 	f.mu.Lock()
 	pending := len(f.uploads)
 	f.mu.Unlock()
+	if pending != 1 {
+		t.Errorf("%d uploads open, want the failed one left resumable", pending)
+	}
+
+	if err := AbortUpload(context.Background(), cl, "b", "flaky.bin", reportedID); err != nil {
+		t.Fatalf("abort: %v", err)
+	}
+	f.mu.Lock()
+	pending = len(f.uploads)
+	f.mu.Unlock()
 	if pending != 0 {
-		t.Errorf("%d multipart uploads left dangling, want 0 (abort should have run)", pending)
+		t.Errorf("%d uploads still open after abort, want 0", pending)
+	}
+}
+
+func TestMultipartUploadResumesFromStoredParts(t *testing.T) {
+	f := newFakeS3()
+	cl := f.start(t)
+
+	payload := make([]byte, 3*MinPartSize)
+	if _, err := rand.Read(payload); err != nil {
+		t.Fatal(err)
+	}
+	local := filepath.Join(t.TempDir(), "resume.bin")
+	if err := os.WriteFile(local, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// First attempt: part 1 lands, parts 2 and 3 are rejected.
+	f.failPartNums[2] = true
+	f.failPartNums[3] = true
+	var uploadID string
+	err := Upload(context.Background(), cl, "b", "resume.bin", local, true, MinPartSize,
+		UploadOptions{PartConcurrency: 1, OnUploadID: func(id string) { uploadID = id }}, nil)
+	if err == nil {
+		t.Fatal("expected the first attempt to fail")
+	}
+	f.mu.Lock()
+	stored := len(f.uploads[uploadID])
+	f.mu.Unlock()
+	if stored == 0 {
+		t.Fatal("the first attempt should have stored at least one part")
+	}
+	partsBefore := f.partPuts
+
+	// Second attempt resumes: only the parts that are missing get re-sent.
+	f.mu.Lock()
+	f.failPartNums = map[int32]bool{}
+	f.mu.Unlock()
+	err = Upload(context.Background(), cl, "b", "resume.bin", local, true, MinPartSize,
+		UploadOptions{PartConcurrency: 3, ResumeUploadID: uploadID}, nil)
+	if err != nil {
+		t.Fatalf("resumed upload failed: %v", err)
+	}
+
+	got, ok := f.get("resume.bin")
+	if !ok || !bytes.Equal(got, payload) {
+		t.Fatalf("resumed upload produced %d bytes, want the original %d", len(got), len(payload))
+	}
+	resent := f.partPuts - partsBefore
+	if resent != 3-stored {
+		t.Errorf("re-sent %d parts, want %d (the %d already stored should be reused)", resent, 3-stored, stored)
+	}
+}
+
+func TestResumeWithStaleUploadIDStartsFresh(t *testing.T) {
+	f := newFakeS3()
+	cl := f.start(t)
+
+	payload := make([]byte, 2*MinPartSize)
+	local := filepath.Join(t.TempDir(), "stale.bin")
+	if err := os.WriteFile(local, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Upload(context.Background(), cl, "b", "stale.bin", local, true, MinPartSize,
+		UploadOptions{ResumeUploadID: "upload-does-not-exist"}, nil)
+	if err != nil {
+		t.Fatalf("an unknown upload id should fall back to a fresh upload, got %v", err)
+	}
+	got, _ := f.get("stale.bin")
+	if len(got) != len(payload) {
+		t.Errorf("uploaded %d bytes, want %d", len(got), len(payload))
+	}
+}
+
+func TestListAndAbortMultipartUploads(t *testing.T) {
+	f := newFakeS3()
+	cl := f.start(t)
+
+	local := filepath.Join(t.TempDir(), "orphan.bin")
+	if err := os.WriteFile(local, make([]byte, 2*MinPartSize), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.failPartNums[2] = true // part 1 lands, part 2 fails, leaving the upload open
+	_ = Upload(context.Background(), cl, "b", "orphan.bin", local, true, MinPartSize,
+		UploadOptions{PartConcurrency: 1}, nil)
+
+	uploads, err := ListMultipartUploads(context.Background(), cl, "b", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uploads) != 1 {
+		t.Fatalf("found %d dangling uploads, want 1", len(uploads))
+	}
+	if uploads[0].Key != "orphan.bin" {
+		t.Errorf("key = %q, want orphan.bin", uploads[0].Key)
+	}
+	if uploads[0].PartCount == 0 || uploads[0].Size == 0 {
+		t.Errorf("upload should report the billable parts it holds, got %+v", uploads[0])
+	}
+
+	n, err := AbortUploads(context.Background(), cl, "b", uploads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("aborted %d uploads, want 1", n)
+	}
+	after, err := ListMultipartUploads(context.Background(), cl, "b", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 0 {
+		t.Errorf("%d uploads remain after the sweep, want 0", len(after))
+	}
+}
+
+func TestFreeKeyNumbersAroundExistingObjects(t *testing.T) {
+	f := newFakeS3()
+	f.put("dir/report.pdf", []byte("x"))
+	f.put("dir/report (1).pdf", []byte("x"))
+	f.put(".gitignore", []byte("x"))
+	cl := f.start(t)
+	ctx := context.Background()
+
+	got, err := FreeKey(ctx, cl, "b", "dir/report.pdf", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "dir/report (2).pdf" {
+		t.Errorf("FreeKey = %q, want dir/report (2).pdf", got)
+	}
+
+	got, err = FreeKey(ctx, cl, "b", "dir/fresh.pdf", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "dir/fresh.pdf" {
+		t.Errorf("an unused key should be returned unchanged, got %q", got)
+	}
+
+	// A leading dot is part of the name, not an extension.
+	got, err = FreeKey(ctx, cl, "b", ".gitignore", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != ".gitignore (1)" {
+		t.Errorf("FreeKey = %q, want \".gitignore (1)\"", got)
+	}
+}
+
+func TestObjectExistsDistinguishesAbsenceFromFailure(t *testing.T) {
+	f := newFakeS3()
+	f.put("here", []byte("x"))
+	cl := f.start(t)
+	ctx := context.Background()
+
+	if ok, err := ObjectExists(ctx, cl, "b", "here"); err != nil || !ok {
+		t.Errorf("ObjectExists(here) = %v, %v; want true, nil", ok, err)
+	}
+	if ok, err := ObjectExists(ctx, cl, "b", "gone"); err != nil || ok {
+		t.Errorf("ObjectExists(gone) = %v, %v; want false, nil", ok, err)
 	}
 }
 

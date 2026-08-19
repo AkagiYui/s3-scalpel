@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"time"
+
 	"s3scalpel/internal/model"
 	"s3scalpel/internal/s3x"
 )
@@ -172,4 +175,28 @@ func (s *BucketService) PutTags(connID, bucket string, tags []model.Tag) error {
 		return err
 	}
 	return s3x.PutBucketTags(ctx, cl, bucket, tags)
+}
+
+// ListMultipartUploads returns the bucket's initiated-but-never-completed
+// multipart uploads. Their parts occupy billable storage until they are aborted.
+func (s *BucketService) ListMultipartUploads(connID, bucket, prefix string) ([]model.MultipartUpload, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return nil, err
+	}
+	return s3x.ListMultipartUploads(ctx, cl, bucket, prefix)
+}
+
+// AbortMultipartUploads discards the given uploads and returns how many were
+// removed. A single failure does not stop the sweep.
+func (s *BucketService) AbortMultipartUploads(connID, bucket string, uploads []model.MultipartUpload) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return 0, err
+	}
+	return s3x.AbortUploads(ctx, cl, bucket, uploads)
 }

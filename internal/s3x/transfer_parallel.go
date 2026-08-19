@@ -65,25 +65,66 @@ func clampConcurrency(n, parts int) int {
 	return n
 }
 
+// listParts returns the parts already stored for an in-flight multipart upload.
+func listParts(ctx context.Context, cl *s3.Client, bucket, key, uploadID string) ([]types.Part, error) {
+	var out []types.Part
+	in := &s3.ListPartsInput{
+		Bucket:   aws.String(bucket),
+		Key:      aws.String(key),
+		UploadId: aws.String(uploadID),
+	}
+	for {
+		page, err := cl.ListParts(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, page.Parts...)
+		if !aws.ToBool(page.IsTruncated) {
+			return out, nil
+		}
+		in.PartNumberMarker = page.NextPartNumberMarker
+	}
+}
+
 // multipartUploadParallel uploads a file's parts concurrently using ReadAt so no
 // shared read cursor is needed. Progress is reported as the cumulative sum of
 // bytes across all in-flight parts.
+//
+// The upload is resumable: when opts.ResumeUploadID names an upload that is
+// still open, its already-stored parts are reused and only the missing ones are
+// sent. It deliberately does NOT abort on failure — the caller owns that
+// decision, because keeping the upload alive is what makes the next attempt a
+// resume rather than a restart. Callers must abort the id they were handed
+// through opts.OnUploadID once they stop retrying.
 func multipartUploadParallel(ctx context.Context, cl *s3.Client, bucket, key string, f *os.File, size int64, ct string, partSize int64, opts UploadOptions, onProgress ProgressFunc) error {
-	createIn := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(key),
-		ContentType: aws.String(ct),
+	var (
+		uploadID *string
+		done     = map[int32]types.Part{}
+	)
+	if opts.ResumeUploadID != "" {
+		if parts, err := listParts(ctx, cl, bucket, key, opts.ResumeUploadID); err == nil {
+			uploadID = aws.String(opts.ResumeUploadID)
+			for _, p := range parts {
+				done[aws.ToInt32(p.PartNumber)] = p
+			}
+		}
+		// A stale or aborted upload id simply falls through to a fresh upload.
 	}
-	opts.applyCreateMultipart(createIn)
-	create, err := cl.CreateMultipartUpload(ctx, createIn)
-	if err != nil {
-		return err
+	if uploadID == nil {
+		createIn := &s3.CreateMultipartUploadInput{
+			Bucket:      aws.String(bucket),
+			Key:         aws.String(key),
+			ContentType: aws.String(ct),
+		}
+		opts.applyCreateMultipart(createIn)
+		create, err := cl.CreateMultipartUpload(ctx, createIn)
+		if err != nil {
+			return err
+		}
+		uploadID = create.UploadId
 	}
-	uploadID := create.UploadId
-	abort := func() {
-		_, _ = cl.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
-			Bucket: aws.String(bucket), Key: aws.String(key), UploadId: uploadID,
-		})
+	if opts.OnUploadID != nil {
+		opts.OnUploadID(aws.ToString(uploadID))
 	}
 
 	plans := planParts(size, partSize)
@@ -104,6 +145,15 @@ func multipartUploadParallel(ctx context.Context, cl *s3.Client, bucket, key str
 	for _, p := range plans {
 		if ctx.Err() != nil {
 			break
+		}
+		// Reuse a part a previous attempt already stored, as long as its length
+		// matches what this plan expects.
+		if prev, ok := done[p.Number]; ok && aws.ToInt64(prev.Size) == p.Length {
+			completed = append(completed, types.CompletedPart{ETag: prev.ETag, PartNumber: aws.Int32(p.Number)})
+			if onProgress != nil {
+				onProgress(total.Add(p.Length))
+			}
+			continue
 		}
 		wg.Add(1)
 		sem <- struct{}{}
@@ -140,28 +190,22 @@ func multipartUploadParallel(ctx context.Context, cl *s3.Client, bucket, key str
 	wg.Wait()
 
 	if firstErr != nil {
-		abort()
 		return firstErr
 	}
-	if ctx.Err() != nil {
-		abort()
-		return ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	sort.Slice(completed, func(i, j int) bool {
 		return aws.ToInt32(completed[i].PartNumber) < aws.ToInt32(completed[j].PartNumber)
 	})
-	_, err = cl.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+	_, err := cl.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket:          aws.String(bucket),
 		Key:             aws.String(key),
 		UploadId:        uploadID,
 		MultipartUpload: &types.CompletedMultipartUpload{Parts: completed},
 	})
-	if err != nil {
-		abort()
-		return err
-	}
-	return nil
+	return err
 }
 
 // downloadParallel fetches an object using concurrent ranged GETs, writing each

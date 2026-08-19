@@ -92,3 +92,14 @@ type ObjectMetaUpdate struct {
 	StorageClass       string            `json:"storageClass"`
 	Metadata           map[string]string `json:"metadata"`
 }
+
+// MultipartUpload is an initiated-but-never-completed multipart upload. Its
+// parts occupy billable storage until the upload is completed or aborted.
+type MultipartUpload struct {
+	Key          string `json:"key"`
+	UploadID     string `json:"uploadId"`
+	Initiated    int64  `json:"initiated"` // unix milliseconds
+	StorageClass string `json:"storageClass"`
+	PartCount    int    `json:"partCount"`
+	Size         int64  `json:"size"` // total bytes held by the uploaded parts
+}

@@ -28,19 +28,24 @@ type fakeS3 struct {
 	uploads map[string]map[int32][]byte // uploadId -> partNumber -> bytes
 
 	// Test hooks.
-	failPut     map[string]int // key -> remaining PutObject failures to inject
-	failPart    int            // remaining UploadPart failures to inject
-	rangeReqs   int            // number of ranged GETs served
-	listPageMax int            // objects per ListObjectsV2 page (0 = unlimited)
-	deleted     []string       // keys deleted, in service order
-	nextUpload  int            // number of multipart uploads created
+	failPut      map[string]int    // key -> remaining PutObject failures to inject
+	failAllParts bool              // reject every UploadPart
+	failPartNums map[int32]bool    // reject these part numbers (survives SDK retries)
+	partPuts     int               // successful UploadPart calls served
+	rangeReqs    int               // number of ranged GETs served
+	listPageMax  int               // objects per ListObjectsV2 page (0 = unlimited)
+	deleted      []string          // keys deleted, in service order
+	nextUpload   int               // number of multipart uploads created
+	uploadKeys   map[string]string // uploadId -> object key
 }
 
 func newFakeS3() *fakeS3 {
 	return &fakeS3{
-		objects: map[string][]byte{},
-		uploads: map[string]map[int32][]byte{},
-		failPut: map[string]int{},
+		objects:      map[string][]byte{},
+		uploads:      map[string]map[int32][]byte{},
+		uploadKeys:   map[string]string{},
+		failPut:      map[string]int{},
+		failPartNums: map[int32]bool{},
 	}
 }
 
@@ -99,6 +104,10 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	switch {
+	case r.Method == http.MethodGet && q.Has("uploads"):
+		f.listMultipartUploads(w)
+	case r.Method == http.MethodGet && q.Has("uploadId"):
+		f.listParts(w, q)
 	case r.Method == http.MethodGet && q.Get("list-type") == "2":
 		f.listObjects(w, q)
 	case r.Method == http.MethodPost && q.Has("uploads"):
@@ -109,7 +118,9 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.completeMultipart(w, r, key, q)
 	case r.Method == http.MethodDelete && q.Has("uploadId"):
 		f.mu.Lock()
-		delete(f.uploads, q.Get("uploadId"))
+		id := q.Get("uploadId")
+		delete(f.uploads, id)
+		delete(f.uploadKeys, id)
 		f.mu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
 	case r.Method == http.MethodPut:
@@ -265,6 +276,7 @@ func (f *fakeS3) createMultipart(w http.ResponseWriter, key string) {
 	f.nextUpload++
 	id := fmt.Sprintf("upload-%d", f.nextUpload)
 	f.uploads[id] = map[int32][]byte{}
+	f.uploadKeys[id] = key
 	f.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/xml")
@@ -272,17 +284,19 @@ func (f *fakeS3) createMultipart(w http.ResponseWriter, key string) {
 }
 
 func (f *fakeS3) uploadPart(w http.ResponseWriter, r *http.Request, q map[string][]string) {
+	id := q["uploadId"][0]
+	num, _ := strconv.Atoi(q["partNumber"][0])
+
 	f.mu.Lock()
-	if f.failPart > 0 {
-		f.failPart--
-		f.mu.Unlock()
+	reject := f.failAllParts || f.failPartNums[int32(num)]
+	f.mu.Unlock()
+	if reject {
+		// A 500 is retriable, so the SDK will re-attempt it; the rejection is
+		// keyed on the part number rather than a countdown so the outcome is
+		// deterministic regardless of how many retries the SDK makes.
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	f.mu.Unlock()
-
-	id := q["uploadId"][0]
-	num, _ := strconv.Atoi(q["partNumber"][0])
 	body, _ := io.ReadAll(r.Body)
 
 	f.mu.Lock()
@@ -290,6 +304,7 @@ func (f *fakeS3) uploadPart(w http.ResponseWriter, r *http.Request, q map[string
 		f.uploads[id] = map[int32][]byte{}
 	}
 	f.uploads[id][int32(num)] = body
+	f.partPuts++
 	f.mu.Unlock()
 
 	w.Header().Set("ETag", fmt.Sprintf(`"part-%d"`, num))
@@ -320,6 +335,7 @@ func (f *fakeS3) completeMultipart(w http.ResponseWriter, r *http.Request, key s
 		assembled = append(assembled, parts[p.PartNumber]...)
 	}
 	delete(f.uploads, id)
+	delete(f.uploadKeys, id)
 	f.objects[key] = assembled
 	f.mu.Unlock()
 
@@ -330,4 +346,71 @@ func (f *fakeS3) completeMultipart(w http.ResponseWriter, r *http.Request, key s
 	}
 	w.Header().Set("Content-Type", "application/xml")
 	_, _ = fmt.Fprintf(w, `<CompleteMultipartUploadResult><Bucket>b</Bucket><Key>%s</Key><ETag>"final"</ETag></CompleteMultipartUploadResult>`, key)
+}
+
+// listMultipartUploads answers GET /<bucket>?uploads.
+func (f *fakeS3) listMultipartUploads(w http.ResponseWriter) {
+	type upload struct {
+		Key      string `xml:"Key"`
+		UploadID string `xml:"UploadId"`
+	}
+	type result struct {
+		XMLName     xml.Name `xml:"ListMultipartUploadsResult"`
+		IsTruncated bool     `xml:"IsTruncated"`
+		Uploads     []upload `xml:"Upload"`
+	}
+	f.mu.Lock()
+	ids := make([]string, 0, len(f.uploadKeys))
+	for id := range f.uploadKeys {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	res := result{}
+	for _, id := range ids {
+		res.Uploads = append(res.Uploads, upload{Key: f.uploadKeys[id], UploadID: id})
+	}
+	f.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/xml")
+	_ = xml.NewEncoder(w).Encode(res)
+}
+
+// listParts answers GET /<bucket>/<key>?uploadId=...
+func (f *fakeS3) listParts(w http.ResponseWriter, q map[string][]string) {
+	type part struct {
+		PartNumber int32  `xml:"PartNumber"`
+		Size       int64  `xml:"Size"`
+		ETag       string `xml:"ETag"`
+	}
+	type result struct {
+		XMLName     xml.Name `xml:"ListPartsResult"`
+		IsTruncated bool     `xml:"IsTruncated"`
+		Parts       []part   `xml:"Part"`
+	}
+	id := q["uploadId"][0]
+
+	f.mu.Lock()
+	stored, ok := f.uploads[id]
+	var numbers []int
+	for n := range stored {
+		numbers = append(numbers, int(n))
+	}
+	sort.Ints(numbers)
+	res := result{}
+	for _, n := range numbers {
+		res.Parts = append(res.Parts, part{
+			PartNumber: int32(n),
+			Size:       int64(len(stored[int32(n)])),
+			ETag:       fmt.Sprintf(`"part-%d"`, n),
+		})
+	}
+	f.mu.Unlock()
+
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`<Error><Code>NoSuchUpload</Code></Error>`))
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml")
+	_ = xml.NewEncoder(w).Encode(res)
 }

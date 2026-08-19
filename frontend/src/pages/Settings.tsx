@@ -25,7 +25,7 @@ import { Switch } from "~/components/ui/switch";
 import { SimpleSelect } from "~/components/ui/select";
 import { toast } from "~/components/ui/toast";
 import { settings, updateSettings } from "~/stores/settings";
-import { AppService, SettingsService, windowID, type AppInfo } from "~/lib/api";
+import { AppService, SettingsService, windowID, type AppInfo, type AppSettings } from "~/lib/api";
 import { t } from "~/i18n";
 import * as bus from "~/lib/bus";
 
@@ -225,6 +225,36 @@ const Settings: Component = () => {
               <Switch
                 checked={settings().autoConsumeQueue}
                 onChange={(v) => updateSettings({ autoConsumeQueue: v })}
+              />
+            </Row>
+            <Separator />
+            <Row label={t("settings.maxAutoRetries")} hint={t("settings.maxAutoRetriesHint")}>
+              <Input
+                type="number"
+                min={0}
+                max={10}
+                class="w-24"
+                value={settings().maxAutoRetries ?? 3}
+                onChange={(e) =>
+                  updateSettings({
+                    maxAutoRetries: Math.max(0, Math.min(10, Number(e.currentTarget.value) || 0)),
+                  })
+                }
+              />
+            </Row>
+            <Separator />
+            <Row label={t("settings.conflictPolicy")} hint={t("settings.conflictPolicyHint")}>
+              <SimpleSelect
+                class="w-52"
+                value={settings().conflictPolicy ?? "overwrite"}
+                onChange={(v) =>
+                  updateSettings({ conflictPolicy: v as AppSettings["conflictPolicy"] })
+                }
+                options={[
+                  { value: "overwrite", label: t("settings.conflictOverwrite") },
+                  { value: "skip", label: t("settings.conflictSkip") },
+                  { value: "rename", label: t("settings.conflictRename") },
+                ]}
               />
             </Row>
             <Separator />

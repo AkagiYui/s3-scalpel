@@ -34,6 +34,7 @@ import {
   SlidersHorizontal,
   BarChart3,
   X as XIcon,
+  Boxes,
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
@@ -63,6 +64,7 @@ import { TagsDialog } from "./TagsDialog";
 import { VersionsDialog } from "./VersionsDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { CapabilitiesDialog } from "./CapabilitiesDialog";
+import { MultipartCleanupDialog } from "./MultipartCleanupDialog";
 import {
   S3Service,
   QueueService,
@@ -122,6 +124,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [copyMove, setCopyMove] = createSignal<{ keys: string[]; move: boolean } | null>(null);
   const [deleteKeys, setDeleteKeys] = createSignal<string[] | null>(null);
   const [capsOpen, setCapsOpen] = createSignal(false);
+  const [multipartOpen, setMultipartOpen] = createSignal(false);
 
   const bucket = () => props.tab.bucket!;
   const prefix = () => props.tab.prefix;
@@ -623,6 +626,14 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
           >
             <ShieldCheck class="h-3.5 w-3.5" />
           </Button>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={() => setMultipartOpen(true)}
+            title={t("multipart.title")}
+          >
+            <Boxes class="h-3.5 w-3.5" />
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setNewFolderOpen(true)}>
             <FolderPlus class="h-3.5 w-3.5" />
             {t("storage.newFolder")}
@@ -927,6 +938,12 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       <CapabilitiesDialog
         open={capsOpen()}
         onOpenChange={setCapsOpen}
+        connId={props.tab.connectionId}
+        bucket={bucket()}
+      />
+      <MultipartCleanupDialog
+        open={multipartOpen()}
+        onOpenChange={setMultipartOpen}
         connId={props.tab.connectionId}
         bucket={bucket()}
       />

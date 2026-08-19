@@ -19,13 +19,23 @@ Bundle identifier: `com.akagiyui.s3_scalpel`
   ⌘T new tab, ⌘W close tab); each window manages connections with custom in-app tabs
   (not native), and several connections/tabs can be open at once.
 - **Operation queue** — uploads, downloads, deletes, copies and moves run through a
-  per-window queue with concurrency limits (default 5), priorities, retry, and live
-  progress (including large multipart transfers). Auto-consume can be toggled; with it
+  per-window queue with concurrency limits (default 5), priorities and live progress
+  (including large multipart transfers). Transient failures (5xx, throttling, timeouts,
+  dropped connections) retry automatically with an exponential backoff; permanent ones
+  (403, 404, malformed request) fail straight away. Auto-consume can be toggled; with it
   off, operations wait for an explicit *Start*. The task panel sits at the bottom of the
   storage page and is collapsible. The queue is persisted to disk; tasks left running by
   a crash are recovered as *failed* for manual retry.
+- **Conflict policy** — when the destination already exists, transfers can overwrite it,
+  skip it, or keep both by writing to the next free `name (n).ext`. Applies to uploads,
+  downloads, copies and moves alike.
 - **Transfers** — drag-and-drop upload, recursive folder upload/download, create folders,
-  multipart upload with a configurable part size (default 8 MiB, min 5 MiB).
+  multipart upload with a configurable part size (default 8 MiB, min 5 MiB) and part
+  concurrency. A multipart upload interrupted by a transient failure **resumes** from
+  the parts already stored rather than starting over.
+- **Incomplete uploads** — multipart uploads that were never finished keep billable
+  parts alive forever; the bucket toolbar lists them with their size and lets you abort
+  them in bulk.
 - **Object tools** — properties, presigned URLs (custom expiry), object tags, object
   versions (when the bucket supports versioning), and previews for images, text and PDF
   (downloaded to a temp dir) plus streamed audio/video via a presigned URL. Preview size

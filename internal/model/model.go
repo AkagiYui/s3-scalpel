@@ -40,7 +40,24 @@ type AppSettings struct {
 	UploadSSE          string `json:"uploadSSE"`          // "", "AES256", "aws:kms"
 	UploadKMSKeyID     string `json:"uploadKMSKeyId"`     // KMS key id when UploadSSE is "aws:kms"
 	PartConcurrency    int    `json:"partConcurrency"`    // concurrent parts per multipart transfer (default 4)
+
+	MaxAutoRetries int            `json:"maxAutoRetries"` // automatic retries for transient failures (0 disables)
+	ConflictPolicy ConflictPolicy `json:"conflictPolicy"` // what to do when the destination already exists
 }
+
+// ConflictPolicy decides what a transfer does when its destination already
+// exists — locally for downloads, remotely for uploads, copies and moves.
+type ConflictPolicy string
+
+const (
+	// ConflictOverwrite replaces the existing object or file.
+	ConflictOverwrite ConflictPolicy = "overwrite"
+	// ConflictSkip leaves the destination untouched and finishes the task as
+	// skipped.
+	ConflictSkip ConflictPolicy = "skip"
+	// ConflictRename writes to the next free "name (n).ext" instead.
+	ConflictRename ConflictPolicy = "rename"
+)
 
 // BucketInfo describes a bucket in a connection.
 type BucketInfo struct {
@@ -119,6 +136,9 @@ const (
 	StatusCompleted TaskStatus = "completed"
 	StatusFailed    TaskStatus = "failed"
 	StatusCanceled  TaskStatus = "canceled"
+	// StatusSkipped means the destination already existed and the conflict
+	// policy chose to leave it alone.
+	StatusSkipped TaskStatus = "skipped"
 )
 
 // Task is a unit of work in a window's operation queue. While running, only its
@@ -141,8 +161,20 @@ type Task struct {
 	Priority     int        `json:"priority"` // higher runs sooner
 	Error        string     `json:"error"`
 	Retries      int        `json:"retries"`
-	CreatedAt    int64      `json:"createdAt"`
-	UpdatedAt    int64      `json:"updatedAt"`
+
+	// NextAttemptAt holds the unix-ms time an automatically retried task becomes
+	// runnable again; the scheduler leaves it pending until then.
+	NextAttemptAt int64 `json:"nextAttemptAt"`
+	// UploadID keeps a multipart upload alive across retries so a large upload
+	// resumes from the parts already stored instead of restarting.
+	UploadID string `json:"uploadId"`
+	// ResolvedKey / ResolvedPath record where the task actually wrote after the
+	// conflict policy renamed the destination.
+	ResolvedKey  string `json:"resolvedKey"`
+	ResolvedPath string `json:"resolvedPath"`
+
+	CreatedAt int64 `json:"createdAt"`
+	UpdatedAt int64 `json:"updatedAt"`
 }
 
 // PreviewKind tells the frontend how to render a preview payload.

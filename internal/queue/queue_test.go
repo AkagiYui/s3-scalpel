@@ -4,10 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"s3scalpel/internal/model"
 	"s3scalpel/internal/store"
@@ -177,5 +182,199 @@ func TestApplySettingsUpdatesLiveQueues(t *testing.T) {
 	m.ApplySettings(0, false)
 	if got := m.State("win-1")["concurrency"]; got != 1 {
 		t.Errorf("concurrency floor = %v, want 1", got)
+	}
+}
+
+func TestClassifyRecognisesSkip(t *testing.T) {
+	if got := classify(errSkipped); got != model.StatusSkipped {
+		t.Errorf("classify(errSkipped) = %q, want %q", got, model.StatusSkipped)
+	}
+	if got := classify(fmt.Errorf("upload: %w", errSkipped)); got != model.StatusSkipped {
+		t.Errorf("a wrapped skip should still classify as skipped, got %q", got)
+	}
+}
+
+func TestBackoffGrowsAndCaps(t *testing.T) {
+	cases := []struct {
+		attempt int
+		want    time.Duration
+	}{
+		{1, time.Second},
+		{2, 2 * time.Second},
+		{3, 4 * time.Second},
+		{4, 8 * time.Second},
+		{6, 30 * time.Second},
+		{40, 30 * time.Second},
+	}
+	for _, c := range cases {
+		if got := backoff(c.attempt); got != c.want {
+			t.Errorf("backoff(%d) = %v, want %v", c.attempt, got, c.want)
+		}
+	}
+}
+
+func TestRetriableTaskIsRequeuedWithBackoffThenGivesUp(t *testing.T) {
+	st, err := store.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attempts atomic.Int32
+	deps := testDeps()
+	deps.Settings = func() model.AppSettings {
+		return model.AppSettings{Concurrency: 1, AutoConsumeQueue: true, MaxAutoRetries: 1}
+	}
+	deps.GetClient = func(context.Context, model.Connection) (*s3.Client, error) {
+		attempts.Add(1)
+		// A 503 is transient, so the queue should retry it.
+		return nil, &smithyhttp.ResponseError{
+			Response: &smithyhttp.Response{Response: &http.Response{StatusCode: 503}},
+			Err:      errors.New("service unavailable"),
+		}
+	}
+	m := NewManager(st, deps)
+
+	m.Add(&model.Task{ID: "t1", WindowID: "win-1", Type: model.TaskUpload, Status: model.StatusPending})
+
+	deadline := time.Now().Add(10 * time.Second)
+	var final model.Task
+	for time.Now().Before(deadline) {
+		tasks := m.Tasks("win-1")
+		if len(tasks) == 1 && tasks[0].Status == model.StatusFailed {
+			final = tasks[0]
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if final.Status != model.StatusFailed {
+		t.Fatalf("task never reached a terminal failure: %+v", m.Tasks("win-1"))
+	}
+	if final.Retries != 1 {
+		t.Errorf("retries = %d, want exactly the configured 1", final.Retries)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("executed %d times, want 2 (initial attempt plus one retry)", got)
+	}
+}
+
+func TestNonRetriableTaskFailsImmediately(t *testing.T) {
+	st, err := store.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attempts atomic.Int32
+	deps := testDeps()
+	deps.Settings = func() model.AppSettings {
+		return model.AppSettings{Concurrency: 1, AutoConsumeQueue: true, MaxAutoRetries: 5}
+	}
+	deps.GetClient = func(context.Context, model.Connection) (*s3.Client, error) {
+		attempts.Add(1)
+		// 403 will never succeed on retry.
+		return nil, &smithyhttp.ResponseError{
+			Response: &smithyhttp.Response{Response: &http.Response{StatusCode: 403}},
+			Err:      errors.New("access denied"),
+		}
+	}
+	m := NewManager(st, deps)
+	m.Add(&model.Task{ID: "t1", WindowID: "win-1", Type: model.TaskUpload, Status: model.StatusPending})
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		tasks := m.Tasks("win-1")
+		if len(tasks) == 1 && tasks[0].Status == model.StatusFailed {
+			if tasks[0].Retries != 0 {
+				t.Errorf("retries = %d, want 0 for a permanent error", tasks[0].Retries)
+			}
+			if got := attempts.Load(); got != 1 {
+				t.Errorf("executed %d times, want 1", got)
+			}
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("task never failed: %+v", m.Tasks("win-1"))
+}
+
+func TestPickNextSkipsTasksInBackoff(t *testing.T) {
+	m := newTestManager(t)
+	q := m.Queue("win-1")
+	q.mu.Lock()
+	q.autoConsume = true
+	q.tasks["waiting"] = &model.Task{
+		ID: "waiting", WindowID: "win-1", Status: model.StatusPending,
+		NextAttemptAt: time.Now().Add(time.Hour).UnixMilli(),
+	}
+	q.order = append(q.order, "waiting")
+	q.mu.Unlock()
+
+	if got := q.pickNext(); got != nil {
+		t.Fatalf("picked %q while it was still in backoff", got.ID)
+	}
+
+	q.mu.Lock()
+	q.tasks["waiting"].NextAttemptAt = time.Now().Add(-time.Second).UnixMilli()
+	q.mu.Unlock()
+
+	got := q.pickNext()
+	if got == nil || got.ID != "waiting" {
+		t.Fatal("a task whose backoff has elapsed should be runnable")
+	}
+	if got.NextAttemptAt != 0 {
+		t.Error("dispatching should clear the backoff deadline")
+	}
+}
+
+func TestManualRetryAcceptsSkippedTasks(t *testing.T) {
+	m := newTestManager(t)
+	m.Add(&model.Task{ID: "s1", WindowID: "win-1", Status: model.StatusSkipped})
+	m.Retry("win-1", "s1")
+
+	tasks := m.Tasks("win-1")
+	if len(tasks) != 1 || tasks[0].Status != model.StatusPending {
+		t.Fatalf("skipped task did not return to pending: %+v", tasks)
+	}
+}
+
+func TestResolveLocalHonoursConflictPolicy(t *testing.T) {
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "report.pdf")
+	if err := os.WriteFile(existing, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := resolveLocal(existing, model.ConflictOverwrite); err != nil || got != existing {
+		t.Errorf("overwrite = %q, %v; want the original path", got, err)
+	}
+	if _, err := resolveLocal(existing, model.ConflictSkip); !errors.Is(err, errSkipped) {
+		t.Errorf("skip returned %v, want errSkipped", err)
+	}
+	got, err := resolveLocal(existing, model.ConflictRename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(dir, "report (1).pdf") {
+		t.Errorf("rename = %q, want %q", got, filepath.Join(dir, "report (1).pdf"))
+	}
+
+	fresh := filepath.Join(dir, "new.pdf")
+	for _, policy := range []model.ConflictPolicy{model.ConflictOverwrite, model.ConflictSkip, model.ConflictRename} {
+		if got, err := resolveLocal(fresh, policy); err != nil || got != fresh {
+			t.Errorf("%s on a free path = %q, %v; want it unchanged", policy, got, err)
+		}
+	}
+}
+
+func TestFreeLocalPathTreatsDotfilesAsNames(t *testing.T) {
+	dir := t.TempDir()
+	dotfile := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(dotfile, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := freeLocalPath(dotfile, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(dir, ".gitignore (1)") {
+		t.Errorf("freeLocalPath = %q, want %q", got, filepath.Join(dir, ".gitignore (1)"))
 	}
 }
