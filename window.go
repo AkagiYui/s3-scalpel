@@ -59,6 +59,8 @@ func (c *Core) createWindow(name string) *application.WebviewWindow {
 		},
 	})
 
+	c.trackWindow(w, name)
+
 	// Forward native file drops (onto elements marked data-file-drop-target) to
 	// the frontend, tagged with this window's id.
 	w.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {

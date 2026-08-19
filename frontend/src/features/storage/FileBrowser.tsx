@@ -35,6 +35,7 @@ import {
   BarChart3,
   X as XIcon,
   Boxes,
+  PenLine,
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
@@ -83,14 +84,19 @@ import {
   type SortKey,
   type SortDir,
 } from "./objects";
-import { formatBytes, formatDate } from "~/lib/utils";
+import { formatBytes, formatDate, keyBasename } from "~/lib/utils";
 import { effectiveLocale, updateSettings } from "~/stores/settings";
 import { toast } from "~/components/ui/toast";
 import { cn } from "~/lib/utils";
 import * as bus from "~/lib/bus";
+import { createVirtualizer } from "@tanstack/solid-virtual";
+import { createCancellableOp } from "~/lib/operation";
 import { t } from "~/i18n";
 
 const wid = windowID();
+
+/** Fixed row height (px) the virtualiser measures against. */
+const ROW_HEIGHT = 34;
 
 export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [entries, setEntries] = createSignal<ObjectEntry[]>([]);
@@ -99,7 +105,8 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [filter, setFilter] = createSignal("");
   const [searchResults, setSearchResults] = createSignal<ObjectEntry[] | null>(null);
   const [searchTruncated, setSearchTruncated] = createSignal(false);
-  const [searching, setSearching] = createSignal(false);
+  const searchOp = createCancellableOp();
+  const searching = searchOp.running;
   const [statsOpen, setStatsOpen] = createSignal(false);
   const [sortKey, setSortKey] = createSignal<SortKey>("name");
   const [sortDir, setSortDir] = createSignal<SortDir>("asc");
@@ -107,7 +114,8 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [focusIndex, setFocusIndex] = createSignal(-1);
   const [buckets, setBuckets] = createSignal<BucketInfo[]>([]);
   let filterInput: HTMLInputElement | undefined;
-  let listEl: HTMLDivElement | undefined;
+  // A signal, not a plain ref: the virtualiser has to react when it is attached.
+  const [listEl, setListEl] = createSignal<HTMLDivElement>();
   // Anchor row for shift-range selection; -1 until the user clicks a row.
   let anchor = -1;
 
@@ -124,6 +132,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [copyMove, setCopyMove] = createSignal<{ keys: string[]; move: boolean } | null>(null);
   const [deleteKeys, setDeleteKeys] = createSignal<string[] | null>(null);
   const [capsOpen, setCapsOpen] = createSignal(false);
+  const [renameEntry, setRenameEntry] = createSignal<ObjectEntry | null>(null);
   const [multipartOpen, setMultipartOpen] = createSignal(false);
 
   const bucket = () => props.tab.bucket!;
@@ -192,22 +201,31 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     return sortEntries(filterEntries(entries(), filter()), sortKey(), sortDir());
   });
 
+  const rowVirtualizer = createVirtualizer({
+    get count() {
+      return visible().length;
+    },
+    getScrollElement: () => listEl() ?? null,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 12,
+  });
+
   const runSearch = async () => {
     const q = filter().trim();
     if (!q) {
       setSearchResults(null);
       return;
     }
-    setSearching(true);
     try {
-      const res = await S3Service.Search(props.tab.connectionId, bucket(), prefix(), q, 1000);
+      const res = await searchOp.run((opID) =>
+        S3Service.Search(opID, props.tab.connectionId, bucket(), prefix(), q, 1000)
+      );
+      if (!res) return; // cancelled or superseded
       setSearchResults(res.entries ?? []);
       setSearchTruncated(res.truncated ?? false);
       clearSelection();
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -292,9 +310,9 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       setSelected(new Set([rows[next].key]));
       anchor = next;
     }
-    listEl
-      ?.querySelector<HTMLElement>(`[data-row-index="${next}"]`)
-      ?.scrollIntoView({ block: "nearest" });
+    // Off-window rows have no DOM node, so scrolling goes through the
+    // virtualiser rather than through the element.
+    rowVirtualizer.scrollToIndex(next, { align: "auto" });
   };
 
   const onListKeyDown = (ev: KeyboardEvent) => {
@@ -449,6 +467,30 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     }
   };
 
+  /**
+   * S3 has no rename, so this enqueues a move: the object (or every object under
+   * a folder prefix) is copied to the new name and the original deleted.
+   */
+  const doRename = async (newName: string) => {
+    const entry = renameEntry();
+    if (!entry) return;
+    try {
+      const n = await QueueService.EnqueueRename(
+        wid,
+        props.tab.connectionId,
+        bucket(),
+        entry.key,
+        newName,
+        0
+      );
+      if (n > 0) toast.success(t("storage.enqueued", { count: n }));
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    } finally {
+      setRenameEntry(null);
+    }
+  };
+
   const createFolder = async (name: string) => {
     try {
       await S3Service.CreateFolder(props.tab.connectionId, bucket(), prefix(), name);
@@ -497,6 +539,10 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         </p.Item>
       </Show>
       <p.Separator />
+      <p.Item onSelect={() => setRenameEntry(p.entry)}>
+        <PenLine class="h-4 w-4" />
+        {t("common.rename")}
+      </p.Item>
       <p.Item onSelect={() => setCopyMove({ keys: [p.entry.key], move: false })}>
         <Copy class="h-4 w-4" />
         {t("storage.copyTo")}
@@ -585,15 +631,28 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
               onKeyDown={(e) => e.key === "Enter" && runSearch()}
             />
           </div>
-          <Button
-            size="icon-sm"
-            variant="outline"
-            onClick={runSearch}
-            title={t("storage.deepSearch")}
-            disabled={searching()}
+          <Show
+            when={!searching()}
+            fallback={
+              <Button
+                size="icon-sm"
+                variant="outline"
+                onClick={searchOp.cancel}
+                title={t("common.cancel")}
+              >
+                <XIcon class="h-3.5 w-3.5 animate-pulse" />
+              </Button>
+            }
           >
-            <Search class={cn("h-3.5 w-3.5", searching() && "animate-pulse")} />
-          </Button>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              onClick={runSearch}
+              title={t("storage.deepSearch")}
+            >
+              <Search class="h-3.5 w-3.5" />
+            </Button>
+          </Show>
           <Button
             size="icon-sm"
             variant="outline"
@@ -726,7 +785,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
 
       {/* Rows */}
       <div
-        ref={listEl}
+        ref={setListEl}
         class="flex-1 overflow-y-auto outline-none"
         tabindex="0"
         role="listbox"
@@ -750,78 +809,110 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
               </div>
             }
           >
-            <For each={visible()}>
-              {(e, i) => (
-                <ContextMenu>
-                  <ContextMenuTrigger
-                    as="div"
-                    data-row-index={i()}
-                    role="option"
-                    aria-selected={selected().has(e.key)}
-                    class={cn(
-                      "grid cursor-default select-none grid-cols-[2rem_1fr_7rem_11rem_6rem_2.5rem] items-center gap-2 border-b px-3 py-1.5 text-sm hover:bg-accent/40",
-                      selected().has(e.key) && "bg-accent/60",
-                      focusIndex() === i() && "ring-1 ring-inset ring-ring"
-                    )}
-                    onClick={(ev: MouseEvent) => onRowClick(i(), ev)}
-                    onDblClick={() => openEntry(e)}
-                    onContextMenu={() => {
-                      // Right-clicking outside the current selection targets just
-                      // that row, matching every native file manager.
-                      if (!selected().has(e.key)) {
-                        setSelected(new Set([e.key]));
-                        setFocusIndex(i());
-                        anchor = i();
-                      }
-                    }}
-                  >
-                    <div onClick={(ev: MouseEvent) => ev.stopPropagation()}>
-                      <Checkbox
-                        aria-label={e.name}
-                        checked={selected().has(e.key)}
-                        onChange={() => toggle(e.key)}
-                      />
-                    </div>
-                    <div class="flex min-w-0 items-center gap-2">
-                      <Show
-                        when={e.isFolder}
-                        fallback={<FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" />}
-                      >
-                        <Folder class="h-4 w-4 shrink-0 text-primary" />
-                      </Show>
-                      <span class="truncate" title={e.key}>
-                        {e.name}
-                      </span>
-                    </div>
-                    <span class="text-right text-muted-foreground">
-                      {e.isFolder ? "—" : formatBytes(e.size)}
-                    </span>
-                    <span class="text-muted-foreground">
-                      {e.isFolder ? "" : formatDate(e.lastModified, effectiveLocale())}
-                    </span>
-                    <span class="truncate text-xs text-muted-foreground">{e.storageClass}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        class="flex h-7 w-7 items-center justify-center rounded hover:bg-accent"
-                        onClick={(ev: MouseEvent) => ev.stopPropagation()}
-                      >
-                        <MoreVertical class="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <RowActions
-                          entry={e}
-                          Item={DropdownMenuItem}
-                          Separator={DropdownMenuSeparator}
-                        />
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <RowActions entry={e} Item={ContextMenuItem} Separator={ContextMenuSeparator} />
-                  </ContextMenuContent>
-                </ContextMenu>
-              )}
-            </For>
+            {/* Virtualised: a bucket page holds up to 1000 rows and "load more"
+                keeps appending, so only the visible window is ever in the DOM. */}
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                position: "relative",
+                width: "100%",
+              }}
+            >
+              <For each={rowVirtualizer.getVirtualItems()}>
+                {(virtualRow) => {
+                  const entry = () => visible()[virtualRow.index];
+                  const index = () => virtualRow.index;
+                  return (
+                    <Show when={entry()}>
+                      <ContextMenu>
+                        <ContextMenuTrigger
+                          as="div"
+                          data-row-index={index()}
+                          role="option"
+                          aria-selected={selected().has(entry().key)}
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            height: `${ROW_HEIGHT}px`,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                          class={cn(
+                            "grid cursor-default select-none grid-cols-[2rem_1fr_7rem_11rem_6rem_2.5rem] items-center gap-2 border-b px-3 text-sm hover:bg-accent/40",
+                            selected().has(entry().key) && "bg-accent/60",
+                            focusIndex() === index() && "ring-1 ring-inset ring-ring"
+                          )}
+                          onClick={(ev: MouseEvent) => onRowClick(index(), ev)}
+                          onDblClick={() => openEntry(entry())}
+                          onContextMenu={() => {
+                            // Right-clicking outside the current selection targets
+                            // just that row, matching every native file manager.
+                            if (!selected().has(entry().key)) {
+                              setSelected(new Set([entry().key]));
+                              setFocusIndex(index());
+                              anchor = index();
+                            }
+                          }}
+                        >
+                          <div onClick={(ev: MouseEvent) => ev.stopPropagation()}>
+                            <Checkbox
+                              aria-label={entry().name}
+                              checked={selected().has(entry().key)}
+                              onChange={() => toggle(entry().key)}
+                            />
+                          </div>
+                          <div class="flex min-w-0 items-center gap-2">
+                            <Show
+                              when={entry().isFolder}
+                              fallback={<FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" />}
+                            >
+                              <Folder class="h-4 w-4 shrink-0 text-primary" />
+                            </Show>
+                            <span class="truncate" title={entry().key}>
+                              {entry().name}
+                            </span>
+                          </div>
+                          <span class="text-right text-muted-foreground">
+                            {entry().isFolder ? "—" : formatBytes(entry().size)}
+                          </span>
+                          <span class="text-muted-foreground">
+                            {entry().isFolder
+                              ? ""
+                              : formatDate(entry().lastModified, effectiveLocale())}
+                          </span>
+                          <span class="truncate text-xs text-muted-foreground">
+                            {entry().storageClass}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              class="flex h-7 w-7 items-center justify-center rounded hover:bg-accent"
+                              onClick={(ev: MouseEvent) => ev.stopPropagation()}
+                            >
+                              <MoreVertical class="h-4 w-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <RowActions
+                                entry={entry()}
+                                Item={DropdownMenuItem}
+                                Separator={DropdownMenuSeparator}
+                              />
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <RowActions
+                            entry={entry()}
+                            Item={ContextMenuItem}
+                            Separator={ContextMenuSeparator}
+                          />
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    </Show>
+                  );
+                }}
+              </For>
+            </div>
             <Show when={nextToken()}>
               <div class="flex justify-center p-3">
                 <Button
@@ -941,6 +1032,19 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         connId={props.tab.connectionId}
         bucket={bucket()}
       />
+      <Show when={renameEntry()}>
+        {(entry) => (
+          <PromptDialog
+            open
+            onOpenChange={(o) => !o && setRenameEntry(null)}
+            title={t("storage.renameTitle")}
+            placeholder={t("storage.newName")}
+            initial={keyBasename(entry().key)}
+            confirmText={t("common.rename")}
+            onSubmit={doRename}
+          />
+        )}
+      </Show>
       <MultipartCleanupDialog
         open={multipartOpen()}
         onOpenChange={setMultipartOpen}

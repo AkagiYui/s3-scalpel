@@ -33,6 +33,8 @@ type Core struct {
 	cacheDir string
 	clients  *s3x.Manager
 	queue    *queue.Manager
+	session  *session
+	ops      *opRegistry
 
 	app   *application.App
 	notif *notifications.NotificationService
@@ -61,6 +63,8 @@ func NewCore(dataDir, cacheDir, version, buildVer string, debug bool) (*Core, er
 	}
 	c := &Core{
 		store:    st,
+		session:  newSession(st),
+		ops:      newOpRegistry(),
 		cacheDir: cacheDir,
 		clients:  s3x.NewManager(),
 		version:  version,

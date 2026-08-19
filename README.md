@@ -12,12 +12,15 @@ Bundle identifier: `com.akagiyui.s3_scalpel`
 - **Connections** — add any number of S3-compatible accounts (display name, endpoint,
   region, path-/virtual-hosted style, access/secret key). Test connections before saving.
   Configs are stored locally and shared across all windows.
-- **Buckets & objects** — create/delete buckets; browse objects as a tree with
-  breadcrumb navigation, path jump, sorting (name/size/date), search/filter, and a
-  right-click context menu.
+- **Buckets & objects** — create/delete buckets; browse objects as a virtualised list
+  with breadcrumb navigation, path jump, sorting (name/size/date), search/filter, rename,
+  full keyboard navigation (arrows, shift-range, ⌘A, Enter, Space) and a right-click
+  context menu. Recursive search, prefix statistics and capability probing can be
+  cancelled while they run.
 - **Multi-window & tabs** — open new windows from the menu (⌘N for a new connection,
   ⌘T new tab, ⌘W close tab); each window manages connections with custom in-app tabs
-  (not native), and several connections/tabs can be open at once.
+  (not native), and several connections/tabs can be open at once. Window geometry and
+  the tab strip are restored on the next launch.
 - **Operation queue** — uploads, downloads, deletes, copies and moves run through a
   per-window queue with concurrency limits (default 5), priorities and live progress
   (including large multipart transfers). Transient failures (5xx, throttling, timeouts,

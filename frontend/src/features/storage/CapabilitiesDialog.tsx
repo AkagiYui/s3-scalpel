@@ -11,6 +11,7 @@ import { Button } from "~/components/ui/button";
 import { Spinner } from "~/components/ui/primitives";
 import { S3Service, type Capability } from "~/lib/api";
 import { toast } from "~/components/ui/toast";
+import { createCancellableOp } from "~/lib/operation";
 import { t } from "~/i18n";
 
 export const CapabilitiesDialog: Component<{
@@ -21,17 +22,17 @@ export const CapabilitiesDialog: Component<{
   bucket?: string;
 }> = (props) => {
   const [caps, setCaps] = createSignal<Capability[]>([]);
-  const [loading, setLoading] = createSignal(false);
+  const op = createCancellableOp();
+  const loading = op.running;
 
   const run = async () => {
-    setLoading(true);
     try {
-      const result = await S3Service.CheckCapabilities(props.connId, props.bucket ?? "");
-      setCaps(result ?? []);
+      const result = await op.run((opID) =>
+        S3Service.CheckCapabilities(opID, props.connId, props.bucket ?? "")
+      );
+      if (result) setCaps(result);
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -59,9 +60,14 @@ export const CapabilitiesDialog: Component<{
         <Show
           when={!loading()}
           fallback={
-            <div class="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-              <Spinner class="h-5 w-5" />
-              {t("capabilities.checking")}
+            <div class="flex flex-col items-center gap-3 py-8 text-sm text-muted-foreground">
+              <div class="flex items-center gap-2">
+                <Spinner class="h-5 w-5" />
+                {t("capabilities.checking")}
+              </div>
+              <Button size="sm" variant="outline" onClick={op.cancel}>
+                {t("common.cancel")}
+              </Button>
             </div>
           }
         >

@@ -71,6 +71,7 @@ func main() {
 		},
 		OnShutdown: func() {
 			core.queue.Flush()
+			core.session.saveNow()
 		},
 	})
 

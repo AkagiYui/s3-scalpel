@@ -102,6 +102,8 @@ export const zh: Dict = {
     selectedSummary: "已选 {{count}} 个，可回收 {{size}}",
   },
   storage: {
+    renameTitle: "重命名",
+    newName: "新名称",
     multipartCleanup: "未完成的上传",
     pickConnection: "选择一个配置",
     pickConnectionHint: "选择一个配置以打开会话标签页。",

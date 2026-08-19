@@ -72,3 +72,26 @@ func containsSub(haystack []byte, needle string) bool {
 	}
 	return false
 }
+
+func TestNewSweepsStaleTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	// A process killed between create and rename leaves these behind.
+	stale := filepath.Join(dir, ".tmp-123456")
+	if err := os.WriteFile(stale, []byte("half written"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	keep := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(keep, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := New(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Error("a stale scratch file should be swept on startup")
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Error("real data files must survive the sweep")
+	}
+}

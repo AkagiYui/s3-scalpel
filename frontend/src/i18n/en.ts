@@ -101,6 +101,8 @@ export const en = {
     selectedSummary: "{{count}} selected, reclaiming {{size}}",
   },
   storage: {
+    renameTitle: "Rename",
+    newName: "New name",
     multipartCleanup: "Incomplete uploads",
     pickConnection: "Select a connection",
     pickConnectionHint: "Choose a connection to open a session tab.",

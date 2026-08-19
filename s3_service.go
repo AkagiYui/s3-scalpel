@@ -61,9 +61,10 @@ func (s *S3Service) ListObjects(connID, bucket, prefix, token string) (model.Lis
 }
 
 // ListAll recursively lists every object under a prefix (for folder operations).
-func (s *S3Service) ListAll(connID, bucket, prefix string) ([]model.ObjectEntry, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+// Pass a non-empty opID to make the scan abortable via AppService.CancelOperation.
+func (s *S3Service) ListAll(opID, connID, bucket, prefix string) ([]model.ObjectEntry, error) {
+	ctx, done := s.core.ops.begin(opID, 5*time.Minute)
+	defer done()
 	cl, _, err := s.core.clientFor(ctx, connID)
 	if err != nil {
 		return nil, err
@@ -72,10 +73,11 @@ func (s *S3Service) ListAll(connID, bucket, prefix string) ([]model.ObjectEntry,
 }
 
 // Search recursively scans objects under a prefix and returns those whose name
-// contains the query (case-insensitive), up to a bounded number of hits.
-func (s *S3Service) Search(connID, bucket, prefix, query string, maxResults int) (model.SearchResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+// contains the query (case-insensitive), up to a bounded number of hits. A
+// non-empty opID makes the scan abortable via AppService.CancelOperation.
+func (s *S3Service) Search(opID, connID, bucket, prefix, query string, maxResults int) (model.SearchResult, error) {
+	ctx, done := s.core.ops.begin(opID, 5*time.Minute)
+	defer done()
 	cl, _, err := s.core.clientFor(ctx, connID)
 	if err != nil {
 		return model.SearchResult{}, err
@@ -90,10 +92,11 @@ func (s *S3Service) Search(connID, bucket, prefix, query string, maxResults int)
 	return model.SearchResult{Entries: entries, Truncated: truncated}, nil
 }
 
-// Stats aggregates object count and cumulative size under a prefix.
-func (s *S3Service) Stats(connID, bucket, prefix string) (model.PrefixStats, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+// Stats aggregates object count and cumulative size under a prefix. A non-empty
+// opID makes the walk abortable via AppService.CancelOperation.
+func (s *S3Service) Stats(opID, connID, bucket, prefix string) (model.PrefixStats, error) {
+	ctx, done := s.core.ops.begin(opID, 5*time.Minute)
+	defer done()
 	cl, _, err := s.core.clientFor(ctx, connID)
 	if err != nil {
 		return model.PrefixStats{}, err
@@ -245,9 +248,9 @@ func (s *S3Service) Restore(connID, bucket, key string, days int, tier string) e
 
 // CheckCapabilities probes which operations the connection's credentials are
 // permitted to perform. Pass an empty bucket for account-level probes only.
-func (s *S3Service) CheckCapabilities(connID, bucket string) ([]model.Capability, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
+func (s *S3Service) CheckCapabilities(opID, connID, bucket string) ([]model.Capability, error) {
+	ctx, done := s.core.ops.begin(opID, 45*time.Second)
+	defer done()
 	cl, _, err := s.core.clientFor(ctx, connID)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -203,6 +204,73 @@ func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []st
 			})
 			count++
 		}
+	}
+	return count, nil
+}
+
+// EnqueueRename renames an object or a whole folder in place. S3 has no rename
+// operation, so this is a move: the object (or every object under the prefix) is
+// copied to the new name and the original deleted. Routing it through the queue
+// means a folder rename gets progress, retry and cancellation like any other
+// bulk operation.
+func (s *QueueService) EnqueueRename(windowID, connID, bucket, key, newName string, priority int) (int, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return 0, fmt.Errorf("the new name is required")
+	}
+	if strings.ContainsAny(newName, "/\\") {
+		return 0, fmt.Errorf("a name cannot contain a path separator")
+	}
+
+	parent := parentPrefix(key)
+	isFolder := strings.HasSuffix(key, "/")
+	if !isFolder {
+		destKey := parent + newName
+		if destKey == key {
+			return 0, nil // renamed to itself
+		}
+		s.add(&model.Task{
+			WindowID: windowID, Type: model.TaskMove, ConnectionID: connID,
+			Bucket: bucket, Key: key,
+			DestConnID: connID, DestBucket: bucket, DestKey: destKey,
+			Priority: priority,
+		})
+		return 1, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cl, _, err := s.core.clientFor(ctx, connID)
+	if err != nil {
+		return 0, err
+	}
+	destPrefix := parent + newName + "/"
+	if destPrefix == key {
+		return 0, nil
+	}
+	entries, err := s3x.ListAllObjects(ctx, cl, bucket, key)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, e := range entries {
+		s.add(&model.Task{
+			WindowID: windowID, Type: model.TaskMove, ConnectionID: connID,
+			Bucket: bucket, Key: e.Key,
+			DestConnID: connID, DestBucket: bucket, DestKey: destPrefix + strings.TrimPrefix(e.Key, key),
+			Size: e.Size, Priority: priority,
+		})
+		count++
+	}
+	if count == 0 {
+		// An empty folder is just its placeholder object.
+		s.add(&model.Task{
+			WindowID: windowID, Type: model.TaskMove, ConnectionID: connID,
+			Bucket: bucket, Key: key,
+			DestConnID: connID, DestBucket: bucket, DestKey: destPrefix,
+			Priority: priority,
+		})
+		count = 1
 	}
 	return count, nil
 }

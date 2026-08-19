@@ -4,6 +4,8 @@ import (
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"s3scalpel/internal/model"
 )
 
 // AppService exposes window management, environment info and OS integrations.
@@ -38,6 +40,24 @@ func (s *AppService) Info() AppInfo {
 		GoVersion:    runtime.Version(),
 		WindowCount:  len(s.core.activeWindowIDs()),
 	}
+}
+
+// CancelOperation aborts a long-running call (search, statistics, recursive
+// listing, capability probing) started with the given operation id. It reports
+// whether an operation was actually running under that id.
+func (s *AppService) CancelOperation(opID string) bool {
+	return s.core.ops.cancel(opID)
+}
+
+// Session returns the workspace remembered for a window: its tab strip and, for
+// reference, the geometry the backend already restored.
+func (s *AppService) Session(windowID string) model.WindowSession {
+	return s.core.session.get(windowID)
+}
+
+// SaveSession records a window's tab strip so a restart can restore it.
+func (s *AppService) SaveSession(windowID string, tabs []model.TabSession) {
+	s.core.session.setTabs(windowID, tabs)
 }
 
 // OpenURL opens a URL (or mailto:) in the default handler.

@@ -6,6 +6,7 @@ import { Toaster } from "~/components/ui/toast";
 import { loadSettings } from "~/stores/settings";
 import { loadConnections } from "~/stores/connections";
 import { initQueue } from "~/stores/tasks";
+import { restoreTabs, persistTabs } from "~/stores/tabs";
 import { windowID, onEvent } from "~/lib/api";
 import { refreshPlatform } from "~/lib/platform";
 import * as bus from "~/lib/bus";
@@ -19,6 +20,10 @@ export const App: Component<RouteSectionProps> = (props) => {
     loadSettings();
     loadConnections();
     initQueue();
+    // Mirroring is wired up first (inside the component's reactive owner) and
+    // stays inert until the restore flips its ready flag.
+    persistTabs();
+    void restoreTabs();
   });
 
   // Menu / global shortcut actions are routed from the Go menu to the focused

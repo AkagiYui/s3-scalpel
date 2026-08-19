@@ -65,7 +65,7 @@ func (s *PreviewService) GetPreview(connID, bucket, key string) (model.PreviewDa
 	if err := s3x.Download(ctx, cl, bucket, key, tmp, s3x.DownloadOptions{}, nil); err != nil {
 		return out, err
 	}
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 
 	data, err := os.ReadFile(tmp)
 	if err != nil {

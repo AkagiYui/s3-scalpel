@@ -215,3 +215,28 @@ type Capability struct {
 	Tested  bool   `json:"tested"`  // whether the probe ran (bucket ops need a bucket)
 	Detail  string `json:"detail"`  // short explanation on failure
 }
+
+// WindowBounds is a window's on-screen geometry, persisted so a restart reopens
+// where the user left off.
+type WindowBounds struct {
+	X      int `json:"x"`
+	Y      int `json:"y"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+// TabSession is one restored tab: which connection it points at and where in
+// that connection it was browsing.
+type TabSession struct {
+	ConnectionID string `json:"connectionId"`
+	Title        string `json:"title"`
+	Bucket       string `json:"bucket"` // "" means the bucket list
+	Prefix       string `json:"prefix"`
+	Active       bool   `json:"active"`
+}
+
+// WindowSession is everything remembered about one window between runs.
+type WindowSession struct {
+	Bounds WindowBounds `json:"bounds"`
+	Tabs   []TabSession `json:"tabs"`
+}

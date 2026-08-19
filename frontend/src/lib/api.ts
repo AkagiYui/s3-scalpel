@@ -38,6 +38,9 @@ import {
   StorageClassStat,
   SearchResult,
   MultipartUpload,
+  TabSession,
+  WindowSession,
+  WindowBounds,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -65,12 +68,23 @@ export {
   StorageClassStat,
   SearchResult,
   MultipartUpload,
+  TabSession,
+  WindowSession,
+  WindowBounds,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */
 export function windowID(): string {
   const p = new URLSearchParams(location.search);
   return p.get("wid") || "win-default";
+}
+
+/**
+ * A fresh id for a cancellable long-running backend operation (search,
+ * statistics, recursive listing, capability probing).
+ */
+export function newOperationID(): string {
+  return crypto.randomUUID();
 }
 
 /**

@@ -11,6 +11,7 @@ import { Spinner } from "~/components/ui/primitives";
 import { S3Service, type PrefixStats } from "~/lib/api";
 import { formatBytes } from "~/lib/utils";
 import { toast } from "~/components/ui/toast";
+import { createCancellableOp } from "~/lib/operation";
 import { t } from "~/i18n";
 
 export const StatsDialog: Component<{
@@ -21,22 +22,22 @@ export const StatsDialog: Component<{
   prefix: string;
 }> = (props) => {
   const [stats, setStats] = createSignal<PrefixStats | null>(null);
-  const [loading, setLoading] = createSignal(false);
+  const op = createCancellableOp();
+  const loading = op.running;
 
   createEffect(() => {
     if (props.open) load();
   });
 
   const load = async () => {
-    setLoading(true);
     setStats(null);
     try {
-      const res = await S3Service.Stats(props.connId, props.bucket, props.prefix);
-      setStats(res as PrefixStats);
+      const res = await op.run((opID) =>
+        S3Service.Stats(opID, props.connId, props.bucket, props.prefix)
+      );
+      if (res) setStats(res as PrefixStats);
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -62,8 +63,11 @@ export const StatsDialog: Component<{
         <Show
           when={!loading()}
           fallback={
-            <div class="flex justify-center py-10">
+            <div class="flex flex-col items-center gap-3 py-10">
               <Spinner class="h-6 w-6" />
+              <Button size="sm" variant="outline" onClick={op.cancel}>
+                {t("common.cancel")}
+              </Button>
             </div>
           }
         >

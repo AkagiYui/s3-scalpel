@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -24,12 +25,30 @@ type Store struct {
 	mu      sync.Mutex
 }
 
-// New creates a Store rooted at baseDir, creating the directory if needed.
+// New creates a Store rooted at baseDir, creating the directory if needed and
+// sweeping away scratch files that a crash left behind mid-write.
 func New(baseDir string) (*Store, error) {
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return nil, err
 	}
-	return &Store{baseDir: baseDir}, nil
+	s := &Store{baseDir: baseDir}
+	s.removeStaleTemps()
+	return s, nil
+}
+
+// removeStaleTemps deletes leftover ".tmp-*" files. writeFileAtomic removes its
+// own scratch file, but a process killed between create and rename cannot, and
+// those files otherwise accumulate in the data directory forever.
+func (s *Store) removeStaleTemps() {
+	entries, err := os.ReadDir(s.baseDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasPrefix(e.Name(), ".tmp-") {
+			_ = os.Remove(filepath.Join(s.baseDir, e.Name()))
+		}
+	}
 }
 
 // BaseDir returns the root directory.
