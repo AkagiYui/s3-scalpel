@@ -7,10 +7,10 @@ package model
 // does NOT include a bucket name: buckets are listed after connecting.
 type Connection struct {
 	ID           string `json:"id"`
-	Name         string `json:"name"`         // display name
-	Endpoint     string `json:"endpoint"`     // e.g. https://cn-nb1.example.com
-	Region       string `json:"region"`       // SigV4 region; "auto" for R2
-	PathStyle    bool   `json:"pathStyle"`    // true = path-style (MinIO), false = virtual-hosted
+	Name         string `json:"name"`      // display name
+	Endpoint     string `json:"endpoint"`  // e.g. https://cn-nb1.example.com
+	Region       string `json:"region"`    // SigV4 region; "auto" for R2
+	PathStyle    bool   `json:"pathStyle"` // true = path-style (MinIO), false = virtual-hosted
 	AccessKey    string `json:"accessKey"`
 	SecretKey    string `json:"secretKey"`
 	SessionToken string `json:"sessionToken"` // optional STS temporary-credential token
@@ -131,9 +131,9 @@ type Task struct {
 	Status       TaskStatus `json:"status"`
 	ConnectionID string     `json:"connectionId"`
 	Bucket       string     `json:"bucket"`
-	Key          string     `json:"key"`            // primary/source object key
-	DestConnID   string     `json:"destConnId"`     // copy/move target connection (empty = same as ConnectionID)
-	DestBucket   string     `json:"destBucket"`     // copy/move target
+	Key          string     `json:"key"`        // primary/source object key
+	DestConnID   string     `json:"destConnId"` // copy/move target connection (empty = same as ConnectionID)
+	DestBucket   string     `json:"destBucket"` // copy/move target
 	DestKey      string     `json:"destKey"`
 	LocalPath    string     `json:"localPath"` // up/download local file path
 	Size         int64      `json:"size"`

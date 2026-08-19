@@ -191,24 +191,6 @@ func StreamCopy(ctx context.Context, src, dst *s3.Client, srcBucket, srcKey, dst
 	return err
 }
 
-// DownloadBytes reads an object fully into memory (bounded by the caller via a
-// prior HeadObject size check). Used for previews.
-func DownloadBytes(ctx context.Context, cl *s3.Client, bucket, key string) ([]byte, string, error) {
-	out, err := cl.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		return nil, "", err
-	}
-	defer out.Body.Close()
-	data, err := io.ReadAll(out.Body)
-	if err != nil {
-		return nil, "", err
-	}
-	return data, aws.ToString(out.ContentType), nil
-}
-
 // ObjectSize returns the content length of an object via HeadObject.
 func ObjectSize(ctx context.Context, cl *s3.Client, bucket, key string) (int64, error) {
 	out, err := cl.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})

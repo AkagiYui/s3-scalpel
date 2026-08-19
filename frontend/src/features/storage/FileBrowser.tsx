@@ -65,8 +65,12 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const [sortKey, setSortKey] = createSignal<SortKey>("name");
   const [sortDir, setSortDir] = createSignal<SortDir>("asc");
   const [selected, setSelected] = createSignal<Set<string>>(new Set<string>());
+  const [focusIndex, setFocusIndex] = createSignal(-1);
   const [buckets, setBuckets] = createSignal<BucketInfo[]>([]);
   let filterInput: HTMLInputElement | undefined;
+  let listEl: HTMLDivElement | undefined;
+  // Anchor row for shift-range selection; -1 until the user clicks a row.
+  let anchor = -1;
 
   // Dialog state.
   const [newFolderOpen, setNewFolderOpen] = createSignal(false);
@@ -105,7 +109,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     on(
       () => [props.tab.connectionId, props.tab.bucket, props.tab.prefix],
       () => {
-        setSelected(new Set<string>());
+        clearSelection();
         setFilter("");
         setSearchResults(null);
         setSearchTruncated(false);
@@ -159,7 +163,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       const res = await S3Service.Search(props.tab.connectionId, bucket(), prefix(), q, 1000);
       setSearchResults(res.entries ?? []);
       setSearchTruncated(res.truncated ?? false);
-      setSelected(new Set<string>());
+      clearSelection();
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
     } finally {
@@ -172,7 +176,16 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     setSearchTruncated(false);
   };
 
+  /* -------------------------------- selection ------------------------------ */
+
+  const clearSelection = () => {
+    setSelected(new Set<string>());
+    setFocusIndex(-1);
+    anchor = -1;
+  };
+
   const allSelected = () => visible().length > 0 && visible().every((e) => selected().has(e.key));
+
   const toggleAll = () => {
     if (allSelected()) {
       setSelected(new Set<string>());
@@ -180,12 +193,112 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       setSelected(new Set(visible().map((e) => e.key)));
     }
   };
+
   const toggle = (key: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
+  };
+
+  /** Select exactly the rows between the anchor and `index` (inclusive). */
+  const selectRange = (index: number) => {
+    const from = anchor < 0 ? index : anchor;
+    const [lo, hi] = from <= index ? [from, index] : [index, from];
+    setSelected(new Set(visible().slice(lo, hi + 1).map((e) => e.key)));
+  };
+
+  /**
+   * Row click semantics match a native file browser: a plain click replaces the
+   * selection, cmd/ctrl-click toggles a single row and shift-click extends from
+   * the anchor. Opening a row is double-click (or Enter).
+   */
+  const onRowClick = (index: number, ev: MouseEvent) => {
+    const entry = visible()[index];
+    if (!entry) return;
+    setFocusIndex(index);
+    if (ev.shiftKey) {
+      selectRange(index);
+      return;
+    }
+    if (ev.metaKey || ev.ctrlKey) {
+      toggle(entry.key);
+      anchor = index;
+      return;
+    }
+    setSelected(new Set([entry.key]));
+    anchor = index;
+  };
+
+  /** Move the keyboard focus, optionally extending the selection with shift. */
+  const moveFocus = (delta: number, extend: boolean) => {
+    const rows = visible();
+    if (!rows.length) return;
+    const cur = focusIndex();
+    const next = Math.min(rows.length - 1, Math.max(0, cur < 0 ? 0 : cur + delta));
+    setFocusIndex(next);
+    if (extend) {
+      if (anchor < 0) anchor = cur < 0 ? next : cur;
+      selectRange(next);
+    } else {
+      setSelected(new Set([rows[next].key]));
+      anchor = next;
+    }
+    listEl
+      ?.querySelector<HTMLElement>(`[data-row-index="${next}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  };
+
+  const onListKeyDown = (ev: KeyboardEvent) => {
+    const rows = visible();
+    switch (ev.key) {
+      case "ArrowDown":
+        ev.preventDefault();
+        moveFocus(1, ev.shiftKey);
+        break;
+      case "ArrowUp":
+        ev.preventDefault();
+        moveFocus(-1, ev.shiftKey);
+        break;
+      case "Home":
+        ev.preventDefault();
+        setFocusIndex(-1);
+        moveFocus(1, ev.shiftKey);
+        break;
+      case "End":
+        ev.preventDefault();
+        setFocusIndex(rows.length);
+        moveFocus(-1, ev.shiftKey);
+        break;
+      case "Enter": {
+        const entry = rows[focusIndex()];
+        if (entry) {
+          ev.preventDefault();
+          openEntry(entry);
+        }
+        break;
+      }
+      case " ": {
+        const entry = rows[focusIndex()];
+        if (entry) {
+          ev.preventDefault();
+          toggle(entry.key);
+        }
+        break;
+      }
+      case "a":
+        if (ev.metaKey || ev.ctrlKey) {
+          ev.preventDefault();
+          setSelected(new Set(rows.map((e) => e.key)));
+        }
+        break;
+      case "Escape":
+        ev.preventDefault();
+        clearSelection();
+        break;
+    }
   };
 
   const setSort = (key: SortKey) => {
@@ -256,7 +369,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         0
       );
       toast.success(t("storage.enqueued", { count: n }));
-      setSelected(new Set<string>());
+      clearSelection();
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
     }
@@ -268,7 +381,7 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     try {
       const n = await QueueService.EnqueueDelete(wid, props.tab.connectionId, bucket(), keys, 0);
       toast.success(t("storage.enqueued", { count: n }));
-      setSelected(new Set<string>());
+      clearSelection();
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
     } finally {
@@ -350,7 +463,15 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   );
 
   return (
-    <div class="flex h-full flex-col" data-file-drop-target>
+    <div class="relative flex h-full flex-col" data-file-drop-target>
+      {/* Shown by the Wails runtime, which toggles .file-drop-target-active on
+          the element carrying data-file-drop-target while files are dragged. */}
+      <div class="drop-overlay">
+        <div class="drop-overlay-card">
+          <Upload class="h-6 w-6" />
+          {t("storage.dropHint")}
+        </div>
+      </div>
       {/* Toolbar */}
       <div class="flex flex-wrap items-center gap-2 border-b px-3 py-2">
         <Button size="icon-sm" variant="ghost" onClick={() => openBucket(props.tab.id, null)} title={t("storage.buckets")}>
@@ -478,29 +599,58 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       </div>
 
       {/* Rows */}
-      <div class="flex-1 overflow-y-auto">
+      <div
+        ref={listEl}
+        class="flex-1 overflow-y-auto outline-none"
+        tabindex="0"
+        role="listbox"
+        aria-multiselectable="true"
+        aria-label={t("storage.objects")}
+        onKeyDown={onListKeyDown}
+      >
         <Show when={!loading() || entries().length > 0} fallback={<div class="flex justify-center py-12"><Spinner class="h-6 w-6" /></div>}>
           <Show
             when={visible().length}
             fallback={<div class="py-16 text-center text-sm text-muted-foreground">{t("storage.empty")}</div>}
           >
             <For each={visible()}>
-              {(e) => (
+              {(e, i) => (
                 <ContextMenu>
                   <ContextMenuTrigger
                     as="div"
+                    data-row-index={i()}
+                    role="option"
+                    aria-selected={selected().has(e.key)}
                     class={cn(
-                      "grid grid-cols-[2rem_1fr_7rem_11rem_6rem_2.5rem] items-center gap-2 border-b px-3 py-1.5 text-sm hover:bg-accent/40",
-                      selected().has(e.key) && "bg-accent/60"
+                      "grid cursor-default select-none grid-cols-[2rem_1fr_7rem_11rem_6rem_2.5rem] items-center gap-2 border-b px-3 py-1.5 text-sm hover:bg-accent/40",
+                      selected().has(e.key) && "bg-accent/60",
+                      focusIndex() === i() && "ring-1 ring-inset ring-ring"
                     )}
+                    onClick={(ev: MouseEvent) => onRowClick(i(), ev)}
+                    onDblClick={() => openEntry(e)}
+                    onContextMenu={() => {
+                      // Right-clicking outside the current selection targets just
+                      // that row, matching every native file manager.
+                      if (!selected().has(e.key)) {
+                        setSelected(new Set([e.key]));
+                        setFocusIndex(i());
+                        anchor = i();
+                      }
+                    }}
                   >
-                    <Checkbox checked={selected().has(e.key)} onChange={() => toggle(e.key)} />
-                    <button class="flex min-w-0 items-center gap-2 text-left" onDblClick={() => openEntry(e)} onClick={() => openEntry(e)}>
+                    <div onClick={(ev: MouseEvent) => ev.stopPropagation()}>
+                      <Checkbox
+                        aria-label={e.name}
+                        checked={selected().has(e.key)}
+                        onChange={() => toggle(e.key)}
+                      />
+                    </div>
+                    <div class="flex min-w-0 items-center gap-2">
                       <Show when={e.isFolder} fallback={<FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" />}>
                         <Folder class="h-4 w-4 shrink-0 text-primary" />
                       </Show>
-                      <span class="truncate">{e.name}</span>
-                    </button>
+                      <span class="truncate" title={e.key}>{e.name}</span>
+                    </div>
                     <span class="text-right text-muted-foreground">{e.isFolder ? "—" : formatBytes(e.size)}</span>
                     <span class="text-muted-foreground">{e.isFolder ? "" : formatDate(e.lastModified, effectiveLocale())}</span>
                     <span class="truncate text-xs text-muted-foreground">{e.storageClass}</span>

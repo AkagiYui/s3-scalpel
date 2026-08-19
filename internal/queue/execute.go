@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -11,6 +12,9 @@ import (
 	"s3scalpel/internal/model"
 	"s3scalpel/internal/s3x"
 )
+
+// progressInterval bounds how often a task emits a progress event.
+const progressInterval = 200 * time.Millisecond
 
 // execute performs the actual S3 work for a task, reporting throttled progress.
 func (q *windowQueue) execute(ctx context.Context, t *model.Task) error {
@@ -25,21 +29,26 @@ func (q *windowQueue) execute(ctx context.Context, t *model.Task) error {
 	s := q.mgr.deps.Settings()
 
 	// Throttle progress events to ~5/sec per task to avoid flooding the bridge.
-	var lastEmit time.Time
+	// Parallel transfers call this from several goroutines at once, so the
+	// throttle clock is an atomic rather than a captured local.
+	var lastEmit atomic.Int64
 	onProgress := func(transferred int64) {
 		q.mu.Lock()
 		t.Transferred = transferred
+		size := t.Size
 		q.mu.Unlock()
-		now := time.Now()
-		if now.Sub(lastEmit) > 200*time.Millisecond {
-			lastEmit = now
-			q.mgr.deps.Emit("task:progress", map[string]any{
-				"windowId":    q.windowID,
-				"id":          t.ID,
-				"transferred": transferred,
-				"size":        t.Size,
-			})
+
+		now := time.Now().UnixNano()
+		prev := lastEmit.Load()
+		if now-prev < int64(progressInterval) || !lastEmit.CompareAndSwap(prev, now) {
+			return
 		}
+		q.mgr.deps.Emit("task:progress", map[string]any{
+			"windowId":    q.windowID,
+			"id":          t.ID,
+			"transferred": transferred,
+			"size":        size,
+		})
 	}
 
 	switch t.Type {

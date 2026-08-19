@@ -4,7 +4,7 @@ package queue
 
 import (
 	"context"
-	"sort"
+	"errors"
 	"sync"
 	"time"
 
@@ -271,6 +271,20 @@ func (q *windowQueue) pickNext() *model.Task {
 	return best
 }
 
+// classify maps an execution result onto a terminal task status. Cancellation is
+// matched with errors.Is because the AWS SDK wraps it in *smithy.OperationError,
+// so a plain equality check would misreport cancelled work as failed.
+func classify(err error) model.TaskStatus {
+	switch {
+	case err == nil:
+		return model.StatusCompleted
+	case errors.Is(err, context.Canceled):
+		return model.StatusCanceled
+	default:
+		return model.StatusFailed
+	}
+}
+
 // run executes a task in its own goroutine.
 func (q *windowQueue) run(t *model.Task) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -285,14 +299,14 @@ func (q *windowQueue) run(t *model.Task) {
 		q.mu.Lock()
 		delete(q.active, t.ID)
 		t.UpdatedAt = time.Now().UnixMilli()
-		switch {
-		case err == nil:
-			t.Status = model.StatusCompleted
+		t.Status = classify(err)
+		switch t.Status {
+		case model.StatusCompleted:
 			t.Transferred = t.Size
-		case ctx.Err() != nil && err == context.Canceled:
-			t.Status = model.StatusCanceled
+			t.Error = ""
+		case model.StatusCanceled:
+			t.Error = ""
 		default:
-			t.Status = model.StatusFailed
 			t.Error = err.Error()
 		}
 		status := t.Status
@@ -339,6 +353,27 @@ func (m *Manager) SetConcurrency(windowID string, n int) {
 	q.concurrency = max(1, n)
 	q.mu.Unlock()
 	q.signal()
+}
+
+// ApplySettings pushes changed global defaults (queue parallelism and automatic
+// dispatch) onto every live window queue, so the Settings page and the per-window
+// task-panel controls stay in agreement.
+func (m *Manager) ApplySettings(concurrency int, autoConsume bool) {
+	m.mu.Lock()
+	queues := make([]*windowQueue, 0, len(m.queues))
+	for _, q := range m.queues {
+		queues = append(queues, q)
+	}
+	m.mu.Unlock()
+
+	for _, q := range queues {
+		q.mu.Lock()
+		q.concurrency = max(1, concurrency)
+		q.autoConsume = autoConsume
+		q.mu.Unlock()
+		q.signal()
+		m.emitState(q.windowID)
+	}
 }
 
 // SetAutoConsume toggles automatic dispatch for a window.
@@ -486,20 +521,4 @@ func removeStr(s []string, v string) []string {
 		}
 	}
 	return out
-}
-
-// SortedTasks returns tasks ordered for display: running, pending, then the rest
-// by recency. (Kept for potential backend-side sorting needs.)
-func SortedTasks(tasks []model.Task) []model.Task {
-	rank := map[model.TaskStatus]int{
-		model.StatusRunning: 0, model.StatusPending: 1,
-		model.StatusFailed: 2, model.StatusCanceled: 3, model.StatusCompleted: 4,
-	}
-	sort.SliceStable(tasks, func(i, j int) bool {
-		if rank[tasks[i].Status] != rank[tasks[j].Status] {
-			return rank[tasks[i].Status] < rank[tasks[j].Status]
-		}
-		return tasks[i].UpdatedAt > tasks[j].UpdatedAt
-	})
-	return tasks
 }

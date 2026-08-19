@@ -8,3 +8,7 @@ build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 .claude
 
 .DS_Store
+
+# Locally built binaries
+/s3scalpel
+/s3-scalpel

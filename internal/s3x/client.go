@@ -22,15 +22,20 @@ import (
 )
 
 // Manager builds and caches *s3.Client instances per connection fingerprint so
-// repeated operations reuse connections.
+// repeated operations reuse connections. byConn maps a connection id to the
+// fingerprints built from it, so editing one connection evicts only its clients.
 type Manager struct {
 	mu      sync.Mutex
 	clients map[string]*s3.Client
+	byConn  map[string]map[string]struct{}
 }
 
 // NewManager creates an empty client manager.
 func NewManager() *Manager {
-	return &Manager{clients: map[string]*s3.Client{}}
+	return &Manager{
+		clients: map[string]*s3.Client{},
+		byConn:  map[string]map[string]struct{}{},
+	}
 }
 
 // fingerprint identifies a client by the connection fields that affect it, so an
@@ -58,20 +63,28 @@ func (m *Manager) Client(ctx context.Context, c model.Connection) (*s3.Client, e
 	}
 	m.mu.Lock()
 	m.clients[key] = cl
+	if m.byConn[c.ID] == nil {
+		m.byConn[c.ID] = map[string]struct{}{}
+	}
+	m.byConn[c.ID][key] = struct{}{}
 	m.mu.Unlock()
 	return cl, nil
 }
 
-// Invalidate drops any cached clients for a connection ID.
+// Invalidate drops the cached clients built from a connection id. An empty id
+// clears the whole cache (used after a bulk import).
 func (m *Manager) Invalidate(connID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for k := range m.clients {
-		// fingerprints are not reversible to the ID, so clear all on any change.
-		// Cheap and safe: clients rebuild lazily.
-		_ = k
+	if connID == "" {
+		m.clients = map[string]*s3.Client{}
+		m.byConn = map[string]map[string]struct{}{}
+		return
 	}
-	m.clients = map[string]*s3.Client{}
+	for key := range m.byConn[connID] {
+		delete(m.clients, key)
+	}
+	delete(m.byConn, connID)
 }
 
 // build constructs an S3 client for an S3-compatible endpoint. It disables the

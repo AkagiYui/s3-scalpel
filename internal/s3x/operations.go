@@ -359,3 +359,41 @@ func IsNotFound(err error) bool {
 	}
 	return false
 }
+
+// ObjectSizes resolves the content length of several keys concurrently so the
+// queue can show determinate progress for individually selected objects. Keys
+// that cannot be headed (missing, or denied) map to 0 rather than failing the
+// whole batch — the transfer itself will surface any real error.
+func ObjectSizes(ctx context.Context, cl *s3.Client, bucket string, keys []string) map[string]int64 {
+	sizes := make(map[string]int64, len(keys))
+	if len(keys) == 0 {
+		return sizes
+	}
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, 16)
+	)
+	for _, key := range keys {
+		if ctx.Err() != nil {
+			break
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(key string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			out, err := cl.HeadObject(ctx, &s3.HeadObjectInput{
+				Bucket: aws.String(bucket), Key: aws.String(key),
+			})
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			sizes[key] = aws.ToInt64(out.ContentLength)
+			mu.Unlock()
+		}(key)
+	}
+	wg.Wait()
+	return sizes
+}

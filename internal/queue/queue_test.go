@@ -2,6 +2,8 @@ package queue
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -130,5 +132,50 @@ func TestPersistenceRoundTrip(t *testing.T) {
 	m2 := NewManager(st, testDeps())
 	if got := len(m2.Tasks("win-1")); got != 1 {
 		t.Errorf("persisted task not reloaded, got %d", got)
+	}
+}
+
+func TestClassifyTreatsWrappedCancellationAsCanceled(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want model.TaskStatus
+	}{
+		{"success", nil, model.StatusCompleted},
+		{"bare cancel", context.Canceled, model.StatusCanceled},
+		// The AWS SDK returns cancellation wrapped in an operation error.
+		{"wrapped cancel", fmt.Errorf("operation error S3: PutObject: %w", context.Canceled), model.StatusCanceled},
+		{"deeply wrapped", fmt.Errorf("a: %w", fmt.Errorf("b: %w", context.Canceled)), model.StatusCanceled},
+		{"deadline", context.DeadlineExceeded, model.StatusFailed},
+		{"other", errors.New("connection reset"), model.StatusFailed},
+	}
+	for _, c := range cases {
+		if got := classify(c.err); got != c.want {
+			t.Errorf("%s: classify(%v)=%q want %q", c.name, c.err, got, c.want)
+		}
+	}
+}
+
+func TestApplySettingsUpdatesLiveQueues(t *testing.T) {
+	m := newTestManager(t)
+	m.Queue("win-1")
+	m.Queue("win-2")
+
+	m.ApplySettings(9, true)
+
+	for _, wid := range []string{"win-1", "win-2"} {
+		state := m.State(wid)
+		if state["concurrency"] != 9 {
+			t.Errorf("%s concurrency = %v, want 9", wid, state["concurrency"])
+		}
+		if state["autoConsume"] != true {
+			t.Errorf("%s autoConsume = %v, want true", wid, state["autoConsume"])
+		}
+	}
+
+	// A window created afterwards still picks the values up from Settings().
+	m.ApplySettings(0, false)
+	if got := m.State("win-1")["concurrency"]; got != 1 {
+		t.Errorf("concurrency floor = %v, want 1", got)
 	}
 }

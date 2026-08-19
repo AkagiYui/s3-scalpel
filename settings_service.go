@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"s3scalpel/internal/model"
-	"s3scalpel/internal/s3x"
 )
 
 // SettingsService exposes application settings to the frontend.
@@ -15,25 +14,10 @@ type SettingsService struct{ core *Core }
 // Get returns the current settings.
 func (s *SettingsService) Get() model.AppSettings { return s.core.Settings() }
 
-// Update replaces the settings, normalising bounds, and persists them.
+// Update replaces the settings, normalising bounds, persisting them and pushing
+// the queue-related values onto every open window.
 func (s *SettingsService) Update(next model.AppSettings) (model.AppSettings, error) {
-	if next.Concurrency <= 0 {
-		next.Concurrency = 5
-	}
-	if next.PartSize < s3x.MinPartSize {
-		next.PartSize = s3x.MinPartSize
-	}
-	if next.PreviewMaxSize <= 0 {
-		next.PreviewMaxSize = 10 * 1024 * 1024
-	}
-	s.core.settingsMu.Lock()
-	s.core.settings = next
-	s.core.settingsMu.Unlock()
-	if err := s.core.saveSettings(); err != nil {
-		return next, err
-	}
-	s.core.emit("settings:changed", next)
-	return next, nil
+	return s.core.setSettings(next)
 }
 
 // settingsBundle is the shape of an export/import file.
@@ -112,20 +96,9 @@ func (s *SettingsService) Import() (bool, error) {
 		return false, fmt.Errorf("invalid settings file: %w", err)
 	}
 
-	next := bundle.Settings
-	if next.Concurrency <= 0 {
-		next.Concurrency = 5
+	if _, err := s.core.setSettings(bundle.Settings); err != nil {
+		return false, err
 	}
-	if next.PartSize < s3x.MinPartSize {
-		next.PartSize = s3x.MinPartSize
-	}
-	if next.PreviewMaxSize <= 0 {
-		next.PreviewMaxSize = 10 * 1024 * 1024
-	}
-	s.core.settingsMu.Lock()
-	s.core.settings = next
-	s.core.settingsMu.Unlock()
-	_ = s.core.saveSettings()
 
 	if len(bundle.Connections) > 0 {
 		s.core.connMu.Lock()
@@ -157,6 +130,5 @@ func (s *SettingsService) Import() (bool, error) {
 		s.core.emit("configs:changed", nil)
 	}
 
-	s.core.emit("settings:changed", next)
 	return true, nil
 }

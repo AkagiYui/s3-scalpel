@@ -20,6 +20,9 @@ import (
 const (
 	settingsFile = "settings.json"
 	connsFile    = "connections.enc"
+
+	maxConcurrency     = 32
+	maxPartConcurrency = 16
 )
 
 // Core holds all shared backend state. A single instance is shared by every
@@ -106,23 +109,59 @@ func (c *Core) Settings() model.AppSettings {
 	return c.settings
 }
 
+// normalizeSettings clamps persisted or imported settings into sane bounds. It
+// is the single place where those bounds live.
+func normalizeSettings(s model.AppSettings) model.AppSettings {
+	d := defaultSettings()
+	if s.Language == "" {
+		s.Language = d.Language
+	}
+	if s.Theme == "" {
+		s.Theme = d.Theme
+	}
+	if s.Concurrency <= 0 {
+		s.Concurrency = d.Concurrency
+	}
+	if s.Concurrency > maxConcurrency {
+		s.Concurrency = maxConcurrency
+	}
+	if s.PartSize < s3x.MinPartSize {
+		s.PartSize = s3x.MinPartSize
+	}
+	if s.PreviewMaxSize <= 0 {
+		s.PreviewMaxSize = d.PreviewMaxSize
+	}
+	if s.PartConcurrency <= 0 {
+		s.PartConcurrency = d.PartConcurrency
+	}
+	if s.PartConcurrency > maxPartConcurrency {
+		s.PartConcurrency = maxPartConcurrency
+	}
+	return s
+}
+
 func (c *Core) loadSettings() {
 	s := defaultSettings()
-	if _, err := c.store.ReadJSON(settingsFile, &s); err == nil {
-		if s.Concurrency <= 0 {
-			s.Concurrency = 5
-		}
-		if s.PartSize < s3x.MinPartSize {
-			s.PartSize = s3x.MinPartSize
-		}
-		if s.PreviewMaxSize <= 0 {
-			s.PreviewMaxSize = 10 * 1024 * 1024
-		}
-		if s.PartConcurrency <= 0 {
-			s.PartConcurrency = 4
-		}
-		c.settings = s
+	if ok, err := c.store.ReadJSON(settingsFile, &s); err == nil && ok {
+		c.settings = normalizeSettings(s)
 	}
+}
+
+// setSettings replaces the settings, persists them and pushes the queue-related
+// values onto every live window queue so both control surfaces agree.
+func (c *Core) setSettings(next model.AppSettings) (model.AppSettings, error) {
+	next = normalizeSettings(next)
+	c.settingsMu.Lock()
+	c.settings = next
+	c.settingsMu.Unlock()
+	if c.queue != nil {
+		c.queue.ApplySettings(next.Concurrency, next.AutoConsumeQueue)
+	}
+	if err := c.saveSettings(); err != nil {
+		return next, err
+	}
+	c.emit("settings:changed", next)
+	return next, nil
 }
 
 func (c *Core) saveSettings() error {
@@ -180,13 +219,11 @@ func (c *Core) emit(event string, data any) {
 }
 
 // Notify sends a system notification (if enabled) and an in-app sound cue (if
-// enabled). The two settings are honoured independently.
+// enabled). The two settings are honoured independently: the sound plays even
+// when system notifications are switched off, and vice versa.
 func (c *Core) Notify(title, body string, isError bool) {
 	s := c.Settings()
-	if !s.NotifyEnabled {
-		return
-	}
-	if c.notif != nil && c.notifyOK {
+	if s.NotifyEnabled && c.notif != nil && c.notifyOK {
 		_ = c.notif.SendNotification(notifications.NotificationOptions{
 			ID:    randID(),
 			Title: title,

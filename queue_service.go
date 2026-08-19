@@ -98,6 +98,10 @@ func (s *QueueService) EnqueueDownload(windowID, connID, bucket string, keys []s
 	if err != nil {
 		return 0, err
 	}
+	// Sizes for directly selected objects come from a batched HeadObject so the
+	// task panel can show determinate progress instead of a spinner.
+	sizes := s3x.ObjectSizes(ctx, cl, bucket, plainKeys(keys))
+
 	count := 0
 	for _, key := range keys {
 		if strings.HasSuffix(key, "/") {
@@ -122,7 +126,7 @@ func (s *QueueService) EnqueueDownload(windowID, connID, bucket string, keys []s
 			local := filepath.Join(destDir, path.Base(key))
 			s.add(&model.Task{
 				WindowID: windowID, Type: model.TaskDownload, ConnectionID: connID,
-				Bucket: bucket, Key: key, LocalPath: local, Priority: priority,
+				Bucket: bucket, Key: key, LocalPath: local, Size: sizes[key], Priority: priority,
 			})
 			count++
 		}
@@ -132,9 +136,15 @@ func (s *QueueService) EnqueueDownload(windowID, connID, bucket string, keys []s
 
 // EnqueueDownloadAs queues a single-file download to an explicit local path.
 func (s *QueueService) EnqueueDownloadAs(windowID, connID, bucket, key, destPath string, priority int) error {
+	ctx, cancel := opCtx()
+	defer cancel()
+	var size int64
+	if cl, _, err := s.core.clientFor(ctx, connID); err == nil {
+		size = s3x.ObjectSizes(ctx, cl, bucket, []string{key})[key]
+	}
 	s.add(&model.Task{
 		WindowID: windowID, Type: model.TaskDownload, ConnectionID: connID,
-		Bucket: bucket, Key: key, LocalPath: destPath, Priority: priority,
+		Bucket: bucket, Key: key, LocalPath: destPath, Size: size, Priority: priority,
 	})
 	return nil
 }
@@ -165,6 +175,7 @@ func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []st
 	if move {
 		ttype = model.TaskMove
 	}
+	sizes := s3x.ObjectSizes(ctx, cl, srcBucket, plainKeys(keys))
 	count := 0
 	for _, key := range keys {
 		if strings.HasSuffix(key, "/") {
@@ -187,7 +198,8 @@ func (s *QueueService) EnqueueCopy(windowID, connID, srcBucket string, keys []st
 			destKey := s3x.JoinKey(destPrefix, path.Base(key))
 			s.add(&model.Task{
 				WindowID: windowID, Type: ttype, ConnectionID: connID,
-				Bucket: srcBucket, Key: key, DestConnID: destConnID, DestBucket: destBucket, DestKey: destKey, Priority: priority,
+				Bucket: srcBucket, Key: key, DestConnID: destConnID, DestBucket: destBucket, DestKey: destKey,
+				Size: sizes[key], Priority: priority,
 			})
 			count++
 		}
@@ -212,6 +224,17 @@ func (s *QueueService) SetPriority(windowID, taskID string, p int) {
 }
 func (s *QueueService) Remove(windowID, taskID string) { s.core.queue.Remove(windowID, taskID) }
 func (s *QueueService) ClearFinished(windowID string)  { s.core.queue.ClearFinished(windowID) }
+
+// plainKeys returns the non-folder subset of keys (folder keys end in "/").
+func plainKeys(keys []string) []string {
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if !strings.HasSuffix(k, "/") {
+			out = append(out, k)
+		}
+	}
+	return out
+}
 
 // parentPrefix returns everything up to and including the parent of a folder key
 // (e.g. "a/b/folder/" -> "a/b/").

@@ -167,3 +167,34 @@
   background: #e81123;
   color: #ffffff;
 }
+
+/* Drag-and-drop upload affordance. The Wails runtime adds
+   .file-drop-target-active to the [data-file-drop-target] element while files
+   are being dragged over the window. */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--primary) / 0.08);
+  border: 2px dashed hsl(var(--primary));
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+.file-drop-target-active > .drop-overlay {
+  display: flex;
+}
+.drop-overlay-card {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--primary));
+  background: hsl(var(--background));
+  box-shadow: 0 8px 24px hsl(var(--foreground) / 0.12);
+}
