@@ -12,3 +12,6 @@ build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 # Locally built binaries
 /s3scalpel
 /s3-scalpel
+
+# Generated Wails bindings (produced by `wails3 generate bindings`)
+frontend/bindings

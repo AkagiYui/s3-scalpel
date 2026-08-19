@@ -1,7 +1,25 @@
 import { createSignal, onMount, onCleanup, Show, For, type Component, type JSX } from "solid-js";
-import { Download, Upload, ExternalLink, Mail, Bug, Palette, Bell, ArrowDownUp, Database } from "lucide-solid";
+import {
+  Download,
+  Upload,
+  ExternalLink,
+  Mail,
+  Bug,
+  Palette,
+  Bell,
+  ArrowDownUp,
+  Database,
+} from "lucide-solid";
 import { PageHeader } from "~/components/PageHeader";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Input, Label, Separator } from "~/components/ui/primitives";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Input,
+  Separator,
+} from "~/components/ui/primitives";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import { SimpleSelect } from "~/components/ui/select";
@@ -13,9 +31,12 @@ import * as bus from "~/lib/bus";
 
 const MB = 1024 * 1024;
 
-const Section: Component<{ icon: JSX.Element; title: string; desc?: string; children: JSX.Element }> = (
-  props
-) => (
+const Section: Component<{
+  icon: JSX.Element;
+  title: string;
+  desc?: string;
+  children: JSX.Element;
+}> = (props) => (
   <Card>
     <CardHeader>
       <CardTitle class="flex items-center gap-2">
@@ -180,7 +201,9 @@ const Settings: Component = () => {
                 class="w-24"
                 value={settings().partConcurrency ?? 4}
                 onChange={(e) =>
-                  updateSettings({ partConcurrency: Math.max(1, Math.min(16, Number(e.currentTarget.value) || 4)) })
+                  updateSettings({
+                    partConcurrency: Math.max(1, Math.min(16, Number(e.currentTarget.value) || 4)),
+                  })
                 }
               />
             </Row>
@@ -205,14 +228,25 @@ const Settings: Component = () => {
               />
             </Row>
             <Separator />
-            <Row label={t("settings.uploadStorageClass")} hint={t("settings.uploadStorageClassHint")}>
+            <Row
+              label={t("settings.uploadStorageClass")}
+              hint={t("settings.uploadStorageClassHint")}
+            >
               <SimpleSelect
                 class="w-52"
                 value={settings().uploadStorageClass ?? ""}
                 onChange={(v) => updateSettings({ uploadStorageClass: v })}
                 options={[
                   { value: "", label: t("settings.providerDefault") },
-                  ...["STANDARD", "STANDARD_IA", "ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER", "DEEP_ARCHIVE", "GLACIER_IR"].map((c) => ({ value: c, label: c })),
+                  ...[
+                    "STANDARD",
+                    "STANDARD_IA",
+                    "ONEZONE_IA",
+                    "INTELLIGENT_TIERING",
+                    "GLACIER",
+                    "DEEP_ARCHIVE",
+                    "GLACIER_IR",
+                  ].map((c) => ({ value: c, label: c })),
                 ]}
               />
             </Row>
@@ -247,7 +281,9 @@ const Settings: Component = () => {
                 class="w-24"
                 value={previewMB()}
                 onChange={(e) =>
-                  updateSettings({ previewMaxSize: Math.max(1, Number(e.currentTarget.value) || 1) * MB })
+                  updateSettings({
+                    previewMaxSize: Math.max(1, Number(e.currentTarget.value) || 1) * MB,
+                  })
                 }
               />
             </Row>
@@ -307,7 +343,11 @@ const Settings: Component = () => {
               </Row>
               <Separator />
               <Row label={t("settings.homepage")}>
-                <Button variant="link" class="h-auto p-0" onClick={() => AppService.OpenURL("https://aky.moe")}>
+                <Button
+                  variant="link"
+                  class="h-auto p-0"
+                  onClick={() => AppService.OpenURL("https://aky.moe")}
+                >
                   aky.moe
                   <ExternalLink class="h-3 w-3" />
                 </Button>

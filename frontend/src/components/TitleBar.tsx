@@ -14,7 +14,10 @@ export const TitleBar: Component = () => {
   const [maximised, setMaximised] = createSignal(false);
 
   onMount(() => {
-    if (!isMac()) Window.IsMaximised().then(setMaximised).catch(() => {});
+    if (!isMac())
+      Window.IsMaximised()
+        .then(setMaximised)
+        .catch(() => {});
   });
 
   const toggleMax = async () => {
@@ -50,7 +53,11 @@ export const TitleBar: Component = () => {
       {/* Windows / Linux window controls */}
       <Show when={!isMac()}>
         <div class="no-drag flex h-full items-center">
-          <button class="winctrl-btn" title={t("window.minimize")} onClick={() => Window.Minimise()}>
+          <button
+            class="winctrl-btn"
+            title={t("window.minimize")}
+            onClick={() => Window.Minimise()}
+          >
             <Minus class="h-4 w-4" />
           </button>
           <button
@@ -62,7 +69,11 @@ export const TitleBar: Component = () => {
               <Copy class="h-3.5 w-3.5" />
             </Show>
           </button>
-          <button class="winctrl-btn winctrl-close" title={t("window.close")} onClick={() => Window.Close()}>
+          <button
+            class="winctrl-btn winctrl-close"
+            title={t("window.close")}
+            onClick={() => Window.Close()}
+          >
             <X class="h-4 w-4" />
           </button>
         </div>

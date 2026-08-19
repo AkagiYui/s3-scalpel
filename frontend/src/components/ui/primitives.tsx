@@ -69,10 +69,7 @@ export const Textarea: Component<ComponentProps<"textarea">> = (props) => {
 export const Label: Component<ComponentProps<"label">> = (props) => {
   const [local, rest] = splitProps(props, ["class"]);
   return (
-    <label
-      class={cn("text-sm font-medium leading-none text-foreground", local.class)}
-      {...rest}
-    />
+    <label class={cn("text-sm font-medium leading-none text-foreground", local.class)} {...rest} />
   );
 };
 
@@ -104,9 +101,9 @@ export const Badge: Component<ComponentProps<"span"> & { variant?: BadgeVariant 
 
 /* ------------------------------- Separator -------------------------------- */
 
-export const Separator: Component<ComponentProps<"div"> & { orientation?: "horizontal" | "vertical" }> = (
-  props
-) => {
+export const Separator: Component<
+  ComponentProps<"div"> & { orientation?: "horizontal" | "vertical" }
+> = (props) => {
   const [local, rest] = splitProps(props, ["class", "orientation"]);
   return (
     <div
@@ -151,11 +148,7 @@ export const Spinner: Component<{ class?: string }> = (props) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-    <path
-      class="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-    />
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
   </svg>
 );
 

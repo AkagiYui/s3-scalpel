@@ -93,7 +93,9 @@
   body {
     @apply bg-background text-foreground;
     margin: 0;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow: hidden;
@@ -157,7 +159,9 @@
   background: none;
   cursor: pointer;
   color: hsl(var(--muted-foreground));
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 .winctrl-btn:hover {
   background: hsl(var(--muted));

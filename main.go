@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
@@ -13,11 +14,20 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// Version metadata. buildVersion can be overridden at link time with
-// -ldflags "-X main.buildVersion=<sha>".
+// VERSION is the single source of truth for the application version; a unit test
+// keeps build/config.yml in step with it. COMMIT identifies the exact build and
+// is rewritten by CI (to the short SHA or the release tag) just before packaging;
+// it stays "dev" for local builds.
+//
+//go:embed VERSION
+var versionRaw string
+
+//go:embed COMMIT
+var commitRaw string
+
 var (
-	version      = "0.1.0"
-	buildVersion = "dev"
+	version      = strings.TrimSpace(versionRaw)
+	buildVersion = strings.TrimSpace(commitRaw)
 )
 
 const appName = "S3 Scalpel"

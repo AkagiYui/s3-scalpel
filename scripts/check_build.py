@@ -53,8 +53,9 @@ def main() -> int:
         with open(github_output, "a") as f:
             f.write(output + "\n")
 
-    # 有功能性变更返回 0，否则返回 1
-    return 0 if result else 1
+    # 始终以 0 退出：是否构建由 should-build 输出决定，
+    # 让「无需构建」显示为跳过而不是失败。
+    return 0
 
 
 if __name__ == "__main__":

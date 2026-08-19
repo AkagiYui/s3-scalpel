@@ -11,7 +11,7 @@ info:
   description: "A surgical S3-compatible object storage client" # The application description
   copyright: "(c) 2026, AkagiYui" # Copyright text
   comments: "S3 Scalpel — manage S3-compatible object storage" # Comments
-  version: "0.1.0" # The application version
+  version: "0.2.0" # The application version — keep in sync with the root VERSION file (enforced by TestVersionMatchesBuildConfig)
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

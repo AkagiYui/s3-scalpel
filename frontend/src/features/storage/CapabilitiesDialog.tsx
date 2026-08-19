@@ -1,6 +1,12 @@
 import { createSignal, createEffect, For, Show, type Component } from "solid-js";
 import { Check, X, Minus, RefreshCw, ShieldCheck } from "lucide-solid";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Spinner } from "~/components/ui/primitives";
 import { S3Service, type Capability } from "~/lib/api";

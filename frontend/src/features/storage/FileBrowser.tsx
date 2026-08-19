@@ -1,4 +1,14 @@
-import { createSignal, createEffect, createMemo, on, For, Show, onMount, onCleanup, type Component } from "solid-js";
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  on,
+  For,
+  Show,
+  onMount,
+  onCleanup,
+  type Component,
+} from "solid-js";
 import {
   ChevronRight,
   Home,
@@ -27,8 +37,20 @@ import {
 } from "lucide-solid";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input, Checkbox, Spinner } from "~/components/ui/primitives";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "~/components/ui/dropdown-menu";
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "~/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "~/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "~/components/ui/context-menu";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { PromptDialog } from "./PromptDialog";
 import { DownloadDialog } from "./DownloadDialog";
@@ -41,9 +63,24 @@ import { TagsDialog } from "./TagsDialog";
 import { VersionsDialog } from "./VersionsDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { CapabilitiesDialog } from "./CapabilitiesDialog";
-import { S3Service, QueueService, AppService, windowID, onEvent, type ObjectEntry, type BucketInfo } from "~/lib/api";
+import {
+  S3Service,
+  QueueService,
+  AppService,
+  windowID,
+  onEvent,
+  type ObjectEntry,
+  type BucketInfo,
+} from "~/lib/api";
 import { navigatePrefix, openBucket, type Tab } from "~/stores/tabs";
-import { filterEntries, sortEntries, breadcrumbSegments, normalizePrefix, type SortKey, type SortDir } from "./objects";
+import {
+  filterEntries,
+  sortEntries,
+  breadcrumbSegments,
+  normalizePrefix,
+  type SortKey,
+  type SortDir,
+} from "./objects";
 import { formatBytes, formatDate } from "~/lib/utils";
 import { effectiveLocale, updateSettings } from "~/stores/settings";
 import { toast } from "~/components/ui/toast";
@@ -207,7 +244,13 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const selectRange = (index: number) => {
     const from = anchor < 0 ? index : anchor;
     const [lo, hi] = from <= index ? [from, index] : [index, from];
-    setSelected(new Set(visible().slice(lo, hi + 1).map((e) => e.key)));
+    setSelected(
+      new Set(
+        visible()
+          .slice(lo, hi + 1)
+          .map((e) => e.key)
+      )
+    );
   };
 
   /**
@@ -323,7 +366,14 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   const enqueueUpload = async (paths: string[]) => {
     if (!paths.length) return;
     try {
-      const n = await QueueService.EnqueueUpload(wid, props.tab.connectionId, bucket(), prefix(), paths, 0);
+      const n = await QueueService.EnqueueUpload(
+        wid,
+        props.tab.connectionId,
+        bucket(),
+        prefix(),
+        paths,
+        0
+      );
       toast.success(t("storage.enqueued", { count: n }));
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
@@ -343,7 +393,14 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
     const keys = downloadKeys();
     if (!keys) return;
     try {
-      const n = await QueueService.EnqueueDownload(wid, props.tab.connectionId, bucket(), keys, destDir, 0);
+      const n = await QueueService.EnqueueDownload(
+        wid,
+        props.tab.connectionId,
+        bucket(),
+        keys,
+        destDir,
+        0
+      );
       if (setDefault) {
         updateSettings({ defaultDownloadDir: destDir });
       }
@@ -454,7 +511,10 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
   );
 
   const SortHeader: Component<{ label: string; k: SortKey; class?: string }> = (p) => (
-    <button class={cn("flex items-center gap-1 hover:text-foreground", p.class)} onClick={() => setSort(p.k)}>
+    <button
+      class={cn("flex items-center gap-1 hover:text-foreground", p.class)}
+      onClick={() => setSort(p.k)}
+    >
       {p.label}
       <Show when={sortKey() === p.k}>
         <ArrowUpDown class="h-3 w-3" />
@@ -474,13 +534,21 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
       </div>
       {/* Toolbar */}
       <div class="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-        <Button size="icon-sm" variant="ghost" onClick={() => openBucket(props.tab.id, null)} title={t("storage.buckets")}>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          onClick={() => openBucket(props.tab.id, null)}
+          title={t("storage.buckets")}
+        >
           <ChevronLeft class="h-4 w-4" />
         </Button>
 
         {/* Breadcrumb */}
         <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto no-scrollbar text-sm">
-          <button class="flex items-center gap-1 font-medium hover:text-primary" onClick={() => navigatePrefix(props.tab.id, "")}>
+          <button
+            class="flex items-center gap-1 font-medium hover:text-primary"
+            onClick={() => navigatePrefix(props.tab.id, "")}
+          >
             <Home class="h-3.5 w-3.5" />
             {bucket()}
           </button>
@@ -488,7 +556,10 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
             {(seg) => (
               <>
                 <ChevronRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <button class="shrink-0 hover:text-primary" onClick={() => navigatePrefix(props.tab.id, seg.prefix)}>
+                <button
+                  class="shrink-0 hover:text-primary"
+                  onClick={() => navigatePrefix(props.tab.id, seg.prefix)}
+                >
                   {seg.name}
                 </button>
               </>
@@ -511,19 +582,45 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
               onKeyDown={(e) => e.key === "Enter" && runSearch()}
             />
           </div>
-          <Button size="icon-sm" variant="outline" onClick={runSearch} title={t("storage.deepSearch")} disabled={searching()}>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={runSearch}
+            title={t("storage.deepSearch")}
+            disabled={searching()}
+          >
             <Search class={cn("h-3.5 w-3.5", searching() && "animate-pulse")} />
           </Button>
-          <Button size="icon-sm" variant="outline" onClick={() => setStatsOpen(true)} title={t("storage.stats")}>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={() => setStatsOpen(true)}
+            title={t("storage.stats")}
+          >
             <BarChart3 class="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setJumpOpen(true)} title={t("storage.goToPath")}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setJumpOpen(true)}
+            title={t("storage.goToPath")}
+          >
             {t("storage.goToPath")}
           </Button>
-          <Button size="icon-sm" variant="outline" onClick={() => load(true)} title={t("storage.refreshList")}>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={() => load(true)}
+            title={t("storage.refreshList")}
+          >
             <RefreshCw class={cn("h-3.5 w-3.5", loading() && "animate-spin")} />
           </Button>
-          <Button size="icon-sm" variant="outline" onClick={() => setCapsOpen(true)} title={t("capabilities.title")}>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            onClick={() => setCapsOpen(true)}
+            title={t("capabilities.title")}
+          >
             <ShieldCheck class="h-3.5 w-3.5" />
           </Button>
           <Button size="sm" variant="outline" onClick={() => setNewFolderOpen(true)}>
@@ -557,7 +654,13 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
           <Show when={searchTruncated()}>
             <span class="text-xs text-amber-500">{t("storage.searchTruncated")}</span>
           </Show>
-          <Button size="icon-sm" variant="ghost" class="ml-auto" onClick={clearSearch} title={t("common.close")}>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            class="ml-auto"
+            onClick={clearSearch}
+            title={t("common.close")}
+          >
             <XIcon class="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -572,11 +675,19 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
               <Download class="h-3.5 w-3.5" />
               {t("common.download")}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setCopyMove({ keys: selectedKeys(), move: false })}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCopyMove({ keys: selectedKeys(), move: false })}
+            >
               <Copy class="h-3.5 w-3.5" />
               {t("storage.copyTo")}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setCopyMove({ keys: selectedKeys(), move: true })}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCopyMove({ keys: selectedKeys(), move: true })}
+            >
               <FolderInput class="h-3.5 w-3.5" />
               {t("storage.moveTo")}
             </Button>
@@ -590,7 +701,11 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
 
       {/* Column header */}
       <div class="grid grid-cols-[2rem_1fr_7rem_11rem_6rem_2.5rem] items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
-        <Checkbox aria-label={t("storage.selectAll")} checked={allSelected()} onChange={toggleAll} />
+        <Checkbox
+          aria-label={t("storage.selectAll")}
+          checked={allSelected()}
+          onChange={toggleAll}
+        />
         <SortHeader label={t("storage.colName")} k="name" />
         <SortHeader label={t("storage.colSize")} k="size" class="justify-end" />
         <SortHeader label={t("storage.colModified")} k="modified" />
@@ -608,10 +723,21 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         aria-label={t("storage.objects")}
         onKeyDown={onListKeyDown}
       >
-        <Show when={!loading() || entries().length > 0} fallback={<div class="flex justify-center py-12"><Spinner class="h-6 w-6" /></div>}>
+        <Show
+          when={!loading() || entries().length > 0}
+          fallback={
+            <div class="flex justify-center py-12">
+              <Spinner class="h-6 w-6" />
+            </div>
+          }
+        >
           <Show
             when={visible().length}
-            fallback={<div class="py-16 text-center text-sm text-muted-foreground">{t("storage.empty")}</div>}
+            fallback={
+              <div class="py-16 text-center text-sm text-muted-foreground">
+                {t("storage.empty")}
+              </div>
+            }
           >
             <For each={visible()}>
               {(e, i) => (
@@ -646,20 +772,36 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
                       />
                     </div>
                     <div class="flex min-w-0 items-center gap-2">
-                      <Show when={e.isFolder} fallback={<FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" />}>
+                      <Show
+                        when={e.isFolder}
+                        fallback={<FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" />}
+                      >
                         <Folder class="h-4 w-4 shrink-0 text-primary" />
                       </Show>
-                      <span class="truncate" title={e.key}>{e.name}</span>
+                      <span class="truncate" title={e.key}>
+                        {e.name}
+                      </span>
                     </div>
-                    <span class="text-right text-muted-foreground">{e.isFolder ? "—" : formatBytes(e.size)}</span>
-                    <span class="text-muted-foreground">{e.isFolder ? "" : formatDate(e.lastModified, effectiveLocale())}</span>
+                    <span class="text-right text-muted-foreground">
+                      {e.isFolder ? "—" : formatBytes(e.size)}
+                    </span>
+                    <span class="text-muted-foreground">
+                      {e.isFolder ? "" : formatDate(e.lastModified, effectiveLocale())}
+                    </span>
                     <span class="truncate text-xs text-muted-foreground">{e.storageClass}</span>
                     <DropdownMenu>
-                      <DropdownMenuTrigger class="flex h-7 w-7 items-center justify-center rounded hover:bg-accent" onClick={(ev: MouseEvent) => ev.stopPropagation()}>
+                      <DropdownMenuTrigger
+                        class="flex h-7 w-7 items-center justify-center rounded hover:bg-accent"
+                        onClick={(ev: MouseEvent) => ev.stopPropagation()}
+                      >
                         <MoreVertical class="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <RowActions entry={e} Item={DropdownMenuItem} Separator={DropdownMenuSeparator} />
+                        <RowActions
+                          entry={e}
+                          Item={DropdownMenuItem}
+                          Separator={DropdownMenuSeparator}
+                        />
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </ContextMenuTrigger>
@@ -671,7 +813,12 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
             </For>
             <Show when={nextToken()}>
               <div class="flex justify-center p-3">
-                <Button variant="outline" size="sm" onClick={() => load(false)} disabled={loading()}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => load(false)}
+                  disabled={loading()}
+                >
                   {t("storage.loadMore")}
                 </Button>
               </div>
@@ -724,25 +871,72 @@ export const FileBrowser: Component<{ tab: Tab }> = (props) => {
         onConfirm={doDelete}
       />
       <Show when={previewKey()}>
-        <PreviewDialog open onOpenChange={(o) => !o && setPreviewKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={previewKey()!} />
+        <PreviewDialog
+          open
+          onOpenChange={(o) => !o && setPreviewKey(null)}
+          connId={props.tab.connectionId}
+          bucket={bucket()}
+          objKey={previewKey()!}
+        />
       </Show>
       <Show when={propsKey()}>
-        <PropertiesDialog open onOpenChange={(o) => !o && setPropsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={propsKey()!} />
+        <PropertiesDialog
+          open
+          onOpenChange={(o) => !o && setPropsKey(null)}
+          connId={props.tab.connectionId}
+          bucket={bucket()}
+          objKey={propsKey()!}
+        />
       </Show>
       <Show when={presignKey()}>
-        <PresignDialog open onOpenChange={(o) => !o && setPresignKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={presignKey()!} />
+        <PresignDialog
+          open
+          onOpenChange={(o) => !o && setPresignKey(null)}
+          connId={props.tab.connectionId}
+          bucket={bucket()}
+          objKey={presignKey()!}
+        />
       </Show>
       <Show when={tagsKey()}>
-        <TagsDialog open onOpenChange={(o) => !o && setTagsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={tagsKey()!} />
+        <TagsDialog
+          open
+          onOpenChange={(o) => !o && setTagsKey(null)}
+          connId={props.tab.connectionId}
+          bucket={bucket()}
+          objKey={tagsKey()!}
+        />
       </Show>
       <Show when={objSettingsKey()}>
-        <ObjectSettingsDialog open onOpenChange={(o) => !o && setObjSettingsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={objSettingsKey()!} />
+        <ObjectSettingsDialog
+          open
+          onOpenChange={(o) => !o && setObjSettingsKey(null)}
+          connId={props.tab.connectionId}
+          bucket={bucket()}
+          objKey={objSettingsKey()!}
+        />
       </Show>
       <Show when={versionsKey()}>
-        <VersionsDialog open onOpenChange={(o) => !o && setVersionsKey(null)} connId={props.tab.connectionId} bucket={bucket()} objKey={versionsKey()!} />
+        <VersionsDialog
+          open
+          onOpenChange={(o) => !o && setVersionsKey(null)}
+          connId={props.tab.connectionId}
+          bucket={bucket()}
+          objKey={versionsKey()!}
+        />
       </Show>
-      <CapabilitiesDialog open={capsOpen()} onOpenChange={setCapsOpen} connId={props.tab.connectionId} bucket={bucket()} />
-      <StatsDialog open={statsOpen()} onOpenChange={setStatsOpen} connId={props.tab.connectionId} bucket={bucket()} prefix={prefix()} />
+      <CapabilitiesDialog
+        open={capsOpen()}
+        onOpenChange={setCapsOpen}
+        connId={props.tab.connectionId}
+        bucket={bucket()}
+      />
+      <StatsDialog
+        open={statsOpen()}
+        onOpenChange={setStatsOpen}
+        connId={props.tab.connectionId}
+        bucket={bucket()}
+        prefix={prefix()}
+      />
     </div>
   );
 };

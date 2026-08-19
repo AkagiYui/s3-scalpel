@@ -1,6 +1,7 @@
 package s3x
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -172,7 +173,7 @@ func downloadParallel(ctx context.Context, cl *s3.Client, bucket, key, dst strin
 	}
 	// Preallocate so concurrent WriteAt calls never race to extend the file.
 	if err := f.Truncate(size); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 
@@ -219,7 +220,7 @@ func downloadParallel(ctx context.Context, cl *s3.Client, bucket, key, dst strin
 				fail(err)
 				return
 			}
-			defer out.Body.Close()
+			defer func() { _ = out.Body.Close() }()
 
 			buf := make([]byte, 256*1024)
 			offset := p.Offset
@@ -253,16 +254,109 @@ func downloadParallel(ctx context.Context, cl *s3.Client, bucket, key, dst strin
 
 	closeErr := f.Close()
 	if firstErr != nil {
-		os.Remove(dst)
+		_ = os.Remove(dst)
 		return firstErr
 	}
 	if ctx.Err() != nil {
-		os.Remove(dst)
+		_ = os.Remove(dst)
 		return ctx.Err()
 	}
 	if closeErr != nil {
-		os.Remove(dst)
+		_ = os.Remove(dst)
 		return closeErr
+	}
+	return nil
+}
+
+// multipartUploadStream uploads a non-seekable source (an HTTP body from another
+// endpoint) as a sequential multipart upload. Each part is staged in a buffer of
+// exactly partSize bytes and handed to the SDK as a *bytes.Reader, which is
+// seekable — a requirement for payload signing on http endpoints and for retry.
+// Parts cannot be parallelised here because the source has a single cursor.
+func multipartUploadStream(ctx context.Context, cl *s3.Client, bucket, key string, src io.Reader, ct string, partSize int64, opts UploadOptions, onProgress ProgressFunc) error {
+	if partSize < MinPartSize {
+		partSize = MinPartSize
+	}
+	createIn := &s3.CreateMultipartUploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+	if ct != "" {
+		createIn.ContentType = aws.String(ct)
+	}
+	opts.applyCreateMultipart(createIn)
+	create, err := cl.CreateMultipartUpload(ctx, createIn)
+	if err != nil {
+		return err
+	}
+	uploadID := create.UploadId
+	abort := func() {
+		_, _ = cl.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
+			Bucket: aws.String(bucket), Key: aws.String(key), UploadId: uploadID,
+		})
+	}
+
+	var (
+		completed []types.CompletedPart
+		buf       = make([]byte, partSize)
+		total     int64
+		number    int32 = 1
+	)
+	for {
+		n, readErr := io.ReadFull(src, buf)
+		if n > 0 {
+			part, err := cl.UploadPart(ctx, &s3.UploadPartInput{
+				Bucket:        aws.String(bucket),
+				Key:           aws.String(key),
+				UploadId:      uploadID,
+				PartNumber:    aws.Int32(number),
+				Body:          bytes.NewReader(buf[:n]),
+				ContentLength: aws.Int64(int64(n)),
+			})
+			if err != nil {
+				abort()
+				return err
+			}
+			completed = append(completed, types.CompletedPart{ETag: part.ETag, PartNumber: aws.Int32(number)})
+			number++
+			total += int64(n)
+			if onProgress != nil {
+				onProgress(total)
+			}
+		}
+		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
+			break
+		}
+		if readErr != nil {
+			abort()
+			return readErr
+		}
+		if err := ctx.Err(); err != nil {
+			abort()
+			return err
+		}
+	}
+
+	if len(completed) == 0 {
+		// A zero-length source still needs an object; a multipart upload with no
+		// parts is invalid, so fall back to an empty PutObject.
+		abort()
+		_, err := cl.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(bucket), Key: aws.String(key),
+			Body: bytes.NewReader(nil), ContentLength: aws.Int64(0),
+		})
+		return err
+	}
+
+	_, err = cl.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:          aws.String(bucket),
+		Key:             aws.String(key),
+		UploadId:        uploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{Parts: completed},
+	})
+	if err != nil {
+		abort()
+		return err
 	}
 	return nil
 }

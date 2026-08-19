@@ -36,15 +36,29 @@ export const PreviewDialog: Component<{
           <DialogTitle class="truncate pr-8">{keyBasename(props.objKey)}</DialogTitle>
         </DialogHeader>
         <div class="flex min-h-[200px] items-center justify-center">
-          <Show when={!data.loading} fallback={<div class="flex flex-col items-center gap-2 text-muted-foreground"><Spinner class="h-6 w-6" />{t("preview.loading")}</div>}>
+          <Show
+            when={!data.loading}
+            fallback={
+              <div class="flex flex-col items-center gap-2 text-muted-foreground">
+                <Spinner class="h-6 w-6" />
+                {t("preview.loading")}
+              </div>
+            }
+          >
             <Show when={data()}>
               {(d) => (
                 <Switch>
                   <Match when={d().kind === "image"}>
-                    <img src={d().dataUrl} alt="" class="max-h-[70vh] max-w-full rounded object-contain" />
+                    <img
+                      src={d().dataUrl}
+                      alt=""
+                      class="max-h-[70vh] max-w-full rounded object-contain"
+                    />
                   </Match>
                   <Match when={d().kind === "text"}>
-                    <pre class="selectable max-h-[70vh] w-full overflow-auto rounded-md bg-muted/50 p-3 text-xs">{d().text}</pre>
+                    <pre class="selectable max-h-[70vh] w-full overflow-auto rounded-md bg-muted/50 p-3 text-xs">
+                      {d().text}
+                    </pre>
                   </Match>
                   <Match when={d().kind === "pdf"}>
                     <iframe src={d().dataUrl} class="h-[72vh] w-full rounded border" title="pdf" />
@@ -58,7 +72,11 @@ export const PreviewDialog: Component<{
                   <Match when={d().kind === "too-large" || d().kind === "unsupported"}>
                     <div class="flex flex-col items-center gap-4 py-8 text-center text-muted-foreground">
                       <FileQuestion class="h-12 w-12 opacity-40" />
-                      <p>{d().kind === "too-large" ? t("preview.tooLarge") : t("preview.unsupported")}</p>
+                      <p>
+                        {d().kind === "too-large"
+                          ? t("preview.tooLarge")
+                          : t("preview.unsupported")}
+                      </p>
                       <Button variant="outline" onClick={openExternal}>
                         <ExternalLink class="h-4 w-4" />
                         {t("preview.openExternal")}

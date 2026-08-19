@@ -40,7 +40,9 @@ const typeIcon = (type: string) => {
   }
 };
 
-const statusVariant = (s: string): "default" | "secondary" | "destructive" | "success" | "warning" => {
+const statusVariant = (
+  s: string
+): "default" | "secondary" | "destructive" | "success" | "warning" => {
   switch (s) {
     case "completed":
       return "success";
@@ -60,7 +62,9 @@ const TaskRow: Component<{ task: Task }> = (props) => {
   const pct = () =>
     props.task.size > 0 ? Math.round((props.task.transferred / props.task.size) * 100) : 0;
   const finished = () =>
-    props.task.status === "completed" || props.task.status === "failed" || props.task.status === "canceled";
+    props.task.status === "completed" ||
+    props.task.status === "failed" ||
+    props.task.status === "canceled";
   const name = () =>
     props.task.type === "copy" || props.task.type === "move"
       ? keyBasename(props.task.destKey || props.task.key)
@@ -104,7 +108,11 @@ const TaskRow: Component<{ task: Task }> = (props) => {
       <div class="flex shrink-0 items-center gap-1">
         <Show when={props.task.status === "pending"}>
           <Tooltip label={t("queue.raisePriority")}>
-            <Button size="icon-sm" variant="ghost" onClick={() => queue.setPriority(props.task.id, props.task.priority + 1)}>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => queue.setPriority(props.task.id, props.task.priority + 1)}
+            >
               <ArrowUp class="h-3.5 w-3.5" />
             </Button>
           </Tooltip>
@@ -166,13 +174,15 @@ export const TaskPanel: Component = () => {
         <div class="ml-auto flex items-center gap-3">
           <label class="flex items-center gap-2 text-xs">
             {t("queue.autoConsume")}
-            <Switch
-              checked={queueState().autoConsume}
-              onChange={(v) => queue.setAutoConsume(v)}
-            />
+            <Switch checked={queueState().autoConsume} onChange={(v) => queue.setAutoConsume(v)} />
           </label>
           <Show when={!queueState().autoConsume}>
-            <Button size="sm" variant="outline" onClick={() => queue.start()} disabled={!pendingCount()}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => queue.start()}
+              disabled={!pendingCount()}
+            >
               <Play class="h-3.5 w-3.5" />
               {t("queue.start")}
             </Button>
@@ -185,7 +195,9 @@ export const TaskPanel: Component = () => {
               max={32}
               class="h-7 w-16"
               value={queueState().concurrency}
-              onChange={(e) => queue.setConcurrency(Math.max(1, Number(e.currentTarget.value) || 1))}
+              onChange={(e) =>
+                queue.setConcurrency(Math.max(1, Number(e.currentTarget.value) || 1))
+              }
             />
           </label>
           <Show when={failedCount()}>
@@ -204,7 +216,9 @@ export const TaskPanel: Component = () => {
         <div class={cn("max-h-72 overflow-y-auto border-t")}>
           <Show
             when={tasks().length}
-            fallback={<div class="py-8 text-center text-sm text-muted-foreground">{t("queue.noTasks")}</div>}
+            fallback={
+              <div class="py-8 text-center text-sm text-muted-foreground">{t("queue.noTasks")}</div>
+            }
           >
             <For each={tasks()}>{(task) => <TaskRow task={task} />}</For>
           </Show>

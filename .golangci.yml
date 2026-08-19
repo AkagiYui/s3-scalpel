@@ -1,0 +1,42 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose # every HTTP/S3 response body must be closed
+    - copyloopvar
+    - errorlint # forces errors.Is/As over == and type assertions
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - wastedassign
+  settings:
+    errcheck:
+      # Deliberate fire-and-forget calls are written as `_ = f()`; flag the rest.
+      check-blank: false
+    revive:
+      rules:
+        - name: exported
+          disabled: true # doc comments are enforced by review, not by the linter
+        - name: package-comments
+          disabled: true
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - bodyclose
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - s3scalpel

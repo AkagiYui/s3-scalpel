@@ -51,7 +51,10 @@ export const DialogHeader: Component<ComponentProps<"div">> = (props) => {
 export const DialogFooter: Component<ComponentProps<"div">> = (props) => {
   const [local, rest] = splitProps(props, ["class"]);
   return (
-    <div class={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", local.class)} {...rest} />
+    <div
+      class={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", local.class)}
+      {...rest}
+    />
   );
 };
 
@@ -68,7 +71,10 @@ export const DialogTitle: Component<ComponentProps<"h2">> = (props) => {
 export const DialogDescription: Component<ComponentProps<"p">> = (props) => {
   const [local, rest] = splitProps(props, ["class"]);
   return (
-    <DialogPrimitive.Description class={cn("text-sm text-muted-foreground", local.class)} {...rest} />
+    <DialogPrimitive.Description
+      class={cn("text-sm text-muted-foreground", local.class)}
+      {...rest}
+    />
   );
 };
 

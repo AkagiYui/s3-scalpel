@@ -309,23 +309,23 @@ func (q *windowQueue) run(t *model.Task) {
 		default:
 			t.Error = err.Error()
 		}
-		status := t.Status
-		ttype := string(t.Type)
-		tkey := t.Key
+		// Snapshot the finished task so everything below reads a stable copy
+		// without holding the queue lock.
+		done := *t
 		q.mu.Unlock()
 
-		q.mgr.notify(status, ttype, tkey)
+		q.mgr.notify(done.Status, string(done.Type), done.Key)
 		q.mgr.emitTasks(q.windowID)
 		q.mgr.scheduleSave()
-		if status == model.StatusCompleted {
+		if done.Status == model.StatusCompleted {
 			q.mgr.deps.Emit("operation:done", map[string]any{
 				"windowId":     q.windowID,
-				"type":         ttype,
-				"connectionId": t.ConnectionID,
-				"bucket":       t.Bucket,
-				"key":          t.Key,
-				"destBucket":   t.DestBucket,
-				"destKey":      t.DestKey,
+				"type":         string(done.Type),
+				"connectionId": done.ConnectionID,
+				"bucket":       done.Bucket,
+				"key":          done.Key,
+				"destBucket":   done.DestBucket,
+				"destKey":      done.DestKey,
 			})
 		}
 		q.signal()
@@ -337,9 +337,10 @@ func (m *Manager) notify(status model.TaskStatus, ttype, key string) {
 		return
 	}
 	// core.Notify gates on the user's notification settings.
-	if status == model.StatusCompleted {
+	switch status {
+	case model.StatusCompleted:
 		m.deps.Notify("Operation complete", ttype+": "+key, false)
-	} else if status == model.StatusFailed {
+	case model.StatusFailed:
 		m.deps.Notify("Operation failed", ttype+": "+key, true)
 	}
 }

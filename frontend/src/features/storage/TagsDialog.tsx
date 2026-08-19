@@ -60,9 +60,19 @@ export const TagsDialog: Component<{
         <DialogHeader>
           <DialogTitle>{t("tags.title")}</DialogTitle>
         </DialogHeader>
-        <Show when={!loading()} fallback={<div class="flex justify-center py-6"><Spinner class="h-6 w-6" /></div>}>
+        <Show
+          when={!loading()}
+          fallback={
+            <div class="flex justify-center py-6">
+              <Spinner class="h-6 w-6" />
+            </div>
+          }
+        >
           <div class="flex flex-col gap-2">
-            <Show when={tags().length} fallback={<div class="py-2 text-sm text-muted-foreground">{t("tags.empty")}</div>}>
+            <Show
+              when={tags().length}
+              fallback={<div class="py-2 text-sm text-muted-foreground">{t("tags.empty")}</div>}
+            >
               <div class="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-muted-foreground">
                 <span>{t("tags.key")}</span>
                 <span>{t("tags.value")}</span>
@@ -71,8 +81,14 @@ export const TagsDialog: Component<{
               <For each={tags()}>
                 {(tg, i) => (
                   <div class="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <Input value={tg.key} onInput={(e) => setRow(i(), { key: e.currentTarget.value })} />
-                    <Input value={tg.value} onInput={(e) => setRow(i(), { value: e.currentTarget.value })} />
+                    <Input
+                      value={tg.key}
+                      onInput={(e) => setRow(i(), { key: e.currentTarget.value })}
+                    />
+                    <Input
+                      value={tg.value}
+                      onInput={(e) => setRow(i(), { value: e.currentTarget.value })}
+                    />
                     <Button variant="ghost" size="icon" onClick={() => removeRow(i())}>
                       <Trash2 class="h-4 w-4 text-destructive" />
                     </Button>

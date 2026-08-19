@@ -15,17 +15,12 @@ export function sortEntries(entries: ObjectEntry[], key: SortKey, dir: SortDir):
   const sign = dir === "asc" ? 1 : -1;
   return [...entries].sort((a, b) => {
     if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-    let cmp = 0;
-    switch (key) {
-      case "size":
-        cmp = a.size - b.size;
-        break;
-      case "modified":
-        cmp = a.lastModified - b.lastModified;
-        break;
-      default:
-        cmp = a.name.localeCompare(b.name);
-    }
+    const cmp =
+      key === "size"
+        ? a.size - b.size
+        : key === "modified"
+          ? a.lastModified - b.lastModified
+          : a.name.localeCompare(b.name);
     return cmp * sign;
   });
 }

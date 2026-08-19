@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go 检查
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 安装 Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: 'go.mod'
+
+      - name: 检查 gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "以下文件未经 gofmt 格式化:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+
+      - name: 单元测试（含竞态检测）
+        run: go test -race -count=1 ./...
+
+  frontend:
+    name: 前端检查
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 安装 Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: 'go.mod'
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: 'frontend/package.json'
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'frontend/package.json'
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      - name: 安装依赖
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      # frontend/bindings 是生成物，不入库，需要在类型检查前生成。
+      - name: 生成 Wails 绑定
+        run: wails3 generate bindings -clean=true
+
+      - name: Prettier 格式检查
+        working-directory: frontend
+        run: pnpm run format:check
+
+      - name: ESLint
+        working-directory: frontend
+        run: pnpm run lint
+
+      - name: TypeScript 类型检查
+        working-directory: frontend
+        run: pnpm run typecheck
+
+      - name: 单元测试
+        working-directory: frontend
+        run: pnpm run test:run
+
+      - name: 生产构建
+        working-directory: frontend
+        run: pnpm run build

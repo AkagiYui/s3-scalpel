@@ -1,6 +1,13 @@
 import { createSignal, createEffect, type Component } from "solid-js";
 import { Folder } from "lucide-solid";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Input, Label, Checkbox } from "~/components/ui/primitives";
 import { AppService, windowID } from "~/lib/api";
@@ -40,12 +47,19 @@ export const DownloadDialog: Component<{
       <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>{t("storage.downloadTo")}</DialogTitle>
-          <DialogDescription>{t("storage.batchDownloadMessage", { count: props.count })}</DialogDescription>
+          <DialogDescription>
+            {t("storage.batchDownloadMessage", { count: props.count })}
+          </DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-3">
           <Label>{t("settings.defaultDownloadDir")}</Label>
           <div class="flex gap-2">
-            <Input class="flex-1" readOnly value={dir()} placeholder={t("settings.defaultDownloadDirNotSet")} />
+            <Input
+              class="flex-1"
+              readOnly
+              value={dir()}
+              placeholder={t("settings.defaultDownloadDirNotSet")}
+            />
             <Button variant="outline" onClick={choose}>
               <Folder class="h-4 w-4" />
               {t("settings.chooseFolder")}

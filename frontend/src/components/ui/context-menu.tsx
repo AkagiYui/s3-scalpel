@@ -44,7 +44,9 @@ export const ContextMenuSeparator: Component<ComponentProps<"div">> = (props) =>
 
 export const ContextMenuLabel: Component<{ class?: string; children?: any }> = (props) => {
   return (
-    <Primitive.GroupLabel class={cn("px-2 py-1.5 text-xs font-semibold text-muted-foreground", props.class)}>
+    <Primitive.GroupLabel
+      class={cn("px-2 py-1.5 text-xs font-semibold text-muted-foreground", props.class)}
+    >
       {props.children}
     </Primitive.GroupLabel>
   );

@@ -28,7 +28,13 @@ export const VersionsDialog: Component<{
 
   const presign = async (versionId: string) => {
     try {
-      const url = await S3Service.PresignGet(props.connId, props.bucket, props.objKey, versionId, 3600);
+      const url = await S3Service.PresignGet(
+        props.connId,
+        props.bucket,
+        props.objKey,
+        versionId,
+        3600
+      );
       await navigator.clipboard.writeText(url);
       toast.success(t("common.copied"));
     } catch (e: any) {
@@ -42,9 +48,30 @@ export const VersionsDialog: Component<{
         <DialogHeader>
           <DialogTitle>{t("versions.title")}</DialogTitle>
         </DialogHeader>
-        <Show when={!info.loading} fallback={<div class="flex justify-center py-8"><Spinner class="h-6 w-6" /></div>}>
-          <Show when={info()?.enabled} fallback={<div class="py-6 text-center text-sm text-muted-foreground">{t("versions.notEnabled")}</div>}>
-            <Show when={info()!.versions.length} fallback={<div class="py-6 text-center text-sm text-muted-foreground">{t("versions.empty")}</div>}>
+        <Show
+          when={!info.loading}
+          fallback={
+            <div class="flex justify-center py-8">
+              <Spinner class="h-6 w-6" />
+            </div>
+          }
+        >
+          <Show
+            when={info()?.enabled}
+            fallback={
+              <div class="py-6 text-center text-sm text-muted-foreground">
+                {t("versions.notEnabled")}
+              </div>
+            }
+          >
+            <Show
+              when={info()!.versions.length}
+              fallback={
+                <div class="py-6 text-center text-sm text-muted-foreground">
+                  {t("versions.empty")}
+                </div>
+              }
+            >
               <div class="max-h-[60vh] divide-y overflow-y-auto">
                 <For each={info()!.versions}>
                   {(v) => (
@@ -52,7 +79,9 @@ export const VersionsDialog: Component<{
                       <div class="min-w-0">
                         <div class="flex items-center gap-2">
                           <Clock class="h-3.5 w-3.5 text-muted-foreground" />
-                          <span class="text-sm">{formatDate(v.lastModified, effectiveLocale())}</span>
+                          <span class="text-sm">
+                            {formatDate(v.lastModified, effectiveLocale())}
+                          </span>
                           <Show when={v.isLatest}>
                             <Badge variant="success">{t("versions.current")}</Badge>
                           </Show>

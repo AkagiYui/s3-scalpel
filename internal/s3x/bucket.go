@@ -188,7 +188,11 @@ func GetLifecycle(ctx context.Context, cl *s3.Client, bucket string) ([]model.Li
 		if r.Filter != nil && r.Filter.Prefix != nil {
 			lr.Prefix = aws.ToString(r.Filter.Prefix)
 		}
-		if r.Prefix != nil {
+		// Fall back to the top-level Prefix, deprecated by AWS but still what
+		// several S3-compatible gateways return. Only consulted when the modern
+		// filter did not carry one.
+		//nolint:staticcheck // r.Prefix is deprecated by AWS but still returned by some gateways.
+		if lr.Prefix == "" && r.Prefix != nil {
 			lr.Prefix = aws.ToString(r.Prefix)
 		}
 		if r.Expiration != nil {

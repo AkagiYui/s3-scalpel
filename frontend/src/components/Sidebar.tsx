@@ -25,12 +25,7 @@ export const Sidebar: Component = () => {
   return (
     <aside class="flex w-56 shrink-0 flex-col border-r bg-card">
       <nav class="flex flex-1 flex-col gap-1 p-2 pt-3">
-        <NavItem
-          href="/"
-          end
-          icon={<Database class="h-4 w-4" />}
-          label={t("nav.connections")}
-        />
+        <NavItem href="/" end icon={<Database class="h-4 w-4" />} label={t("nav.connections")} />
         <NavItem href="/storage" icon={<HardDrive class="h-4 w-4" />} label={t("nav.storage")} />
       </nav>
 

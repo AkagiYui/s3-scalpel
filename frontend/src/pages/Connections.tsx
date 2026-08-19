@@ -89,7 +89,9 @@ const Connections: Component = () => {
                       <div class="flex items-center gap-2">
                         <span class="truncate font-medium">{c.name}</span>
                         <Badge variant="secondary">
-                          {c.pathStyle ? t("connections.pathStyle") : t("connections.virtualHosted")}
+                          {c.pathStyle
+                            ? t("connections.pathStyle")
+                            : t("connections.virtualHosted")}
                         </Badge>
                       </div>
                       <div class="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">

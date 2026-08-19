@@ -6,6 +6,14 @@ on:
     branches:
       - master
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   # 检查 commits，决定是否需要构建
   check-commits:
@@ -30,6 +38,7 @@ jobs:
     if: needs.check-commits.outputs.should-build == 'true'
     # 构建任务
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -38,6 +47,9 @@ jobs:
           - os: windows-latest
             arch: x64
             artifact: s3-scalpel-windows-x64
+          - os: ubuntu-latest
+            arch: x64
+            artifact: s3-scalpel-linux-x64
 
     name: 构建 ${{ matrix.os }} (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
@@ -60,8 +72,6 @@ jobs:
         uses: pnpm/action-setup@v6
         with:
           package_json_file: 'frontend/package.json'
-          cache: true
-          cache_dependency_path: 'frontend/pnpm-lock.yaml'
 
       - name: 安装 Node.js
         uses: actions/setup-node@v6
@@ -69,6 +79,13 @@ jobs:
           node-version-file: 'frontend/package.json'
           cache: 'pnpm'
           cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      - name: 安装 Linux 构建依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: 安装 NSIS (Windows)
         if: runner.os == 'Windows'
@@ -79,6 +96,10 @@ jobs:
       - name: 安装 Wails CLI
         run: |
           go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      # COMMIT 会被嵌入二进制，显示在「关于」面板里，便于定位问题版本。
+      - name: 写入构建标识
+        run: git rev-parse --short HEAD > COMMIT
 
       - name: 更新构建资源
         run: wails3 task common:update:build-assets
@@ -91,6 +112,7 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: bin/
+          retention-days: 30
 
   # 生成构建摘要
   summary:

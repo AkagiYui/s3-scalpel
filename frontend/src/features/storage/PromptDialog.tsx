@@ -1,5 +1,12 @@
 import { createSignal, createEffect, Show, type Component } from "solid-js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/primitives";
 import { t } from "~/i18n";

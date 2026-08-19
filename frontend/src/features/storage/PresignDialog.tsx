@@ -1,6 +1,13 @@
 import { createSignal, createEffect, Show, type Component } from "solid-js";
 import { Copy, Link } from "lucide-solid";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Input, Label, Spinner } from "~/components/ui/primitives";
 import { SimpleSelect } from "~/components/ui/select";
@@ -42,7 +49,13 @@ export const PresignDialog: Component<{
       const u =
         method() === "PUT"
           ? await S3Service.PresignPut(props.connId, props.bucket, props.objKey, "", seconds())
-          : await S3Service.PresignGet(props.connId, props.bucket, props.objKey, props.versionId ?? "", seconds());
+          : await S3Service.PresignGet(
+              props.connId,
+              props.bucket,
+              props.objKey,
+              props.versionId ?? "",
+              seconds()
+            );
       setUrl(u);
     } catch (e: any) {
       toast.error(String(e?.message ?? e));

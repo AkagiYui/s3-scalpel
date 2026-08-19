@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的标签（例如 v0.2.0）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: 校验版本号
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      # 标签必须与仓库里的 VERSION 一致，避免发出版本号对不上的包。
+      - name: 比对标签与 VERSION
+        id: version
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="$(cat VERSION | tr -d '[:space:]')"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          if [ "${tag}" != "v${version}" ]; then
+            echo "标签 ${tag} 与 VERSION (${version}) 不一致；请先更新 VERSION 和 build/config.yml" >&2
+            exit 1
+          fi
+
+  package:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+            asset: s3-scalpel-${{ needs.verify.outputs.version }}-macos-arm64
+          - os: macos-13
+            arch: amd64
+            asset: s3-scalpel-${{ needs.verify.outputs.version }}-macos-amd64
+          - os: windows-latest
+            arch: x64
+            asset: s3-scalpel-${{ needs.verify.outputs.version }}-windows-x64
+          - os: ubuntu-latest
+            arch: x64
+            asset: s3-scalpel-${{ needs.verify.outputs.version }}-linux-x64
+
+    name: 打包 ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 安装 Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: 'go.mod'
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: 'frontend/package.json'
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'frontend/package.json'
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      - name: 安装 Linux 构建依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: 安装 NSIS (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install nsis --version=3.12 --no-progress -y
+          echo "C:\Program Files (x86)\NSIS" >> "${GITHUB_PATH}"
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: 写入构建标识
+        run: echo "${{ github.event.inputs.tag || github.ref_name }}" > COMMIT
+
+      - name: 更新构建资源
+        run: wails3 task common:update:build-assets
+
+      - name: 打包应用
+        run: wails3 package
+
+      - name: 归档产物
+        run: |
+          cd bin
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            7z a "../${{ matrix.asset }}.zip" ./*
+          else
+            zip -ry "../${{ matrix.asset }}.zip" ./*
+          fi
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: ${{ matrix.asset }}.zip

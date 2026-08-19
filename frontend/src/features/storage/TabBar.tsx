@@ -1,6 +1,12 @@
 import { For, Show, type Component } from "solid-js";
 import { X, Plus, Database } from "lucide-solid";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "~/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "~/components/ui/dropdown-menu";
 import { tabs, activeTabId, focusTab, closeTab, openTab, type Tab } from "~/stores/tabs";
 import { connections } from "~/stores/connections";
 import { cn } from "~/lib/utils";
@@ -62,7 +68,9 @@ export const TabBar: Component = () => {
           <DropdownMenuLabel>{t("storage.pickConnection")}</DropdownMenuLabel>
           <Show
             when={connections().length}
-            fallback={<div class="px-2 py-1.5 text-sm text-muted-foreground">{t("connections.none")}</div>}
+            fallback={
+              <div class="px-2 py-1.5 text-sm text-muted-foreground">{t("connections.none")}</div>
+            }
           >
             <For each={connections()}>
               {(c) => (

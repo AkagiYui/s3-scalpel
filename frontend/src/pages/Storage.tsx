@@ -1,5 +1,5 @@
 import { Show, For, onMount, onCleanup, type Component } from "solid-js";
-import { HardDrive, Database, Plus } from "lucide-solid";
+import { HardDrive, Database } from "lucide-solid";
 import { TabBar } from "~/features/storage/TabBar";
 import { BucketList } from "~/features/storage/BucketList";
 import { FileBrowser } from "~/features/storage/FileBrowser";
@@ -41,7 +41,14 @@ const Storage: Component = () => {
         return;
       }
       try {
-        const n = await QueueService.EnqueueUpload(wid, cur.connectionId, cur.bucket, cur.prefix, paths, 0);
+        const n = await QueueService.EnqueueUpload(
+          wid,
+          cur.connectionId,
+          cur.bucket,
+          cur.prefix,
+          paths,
+          0
+        );
         toast.success(t("storage.enqueued", { count: n }));
       } catch (e: any) {
         toast.error(String(e?.message ?? e));
@@ -90,7 +97,9 @@ const Storage: Component = () => {
             {(tab) => (
               <Show
                 when={tab.bucket}
-                fallback={<BucketList connId={tab.connectionId} onOpen={(b) => openBucket(tab.id, b)} />}
+                fallback={
+                  <BucketList connId={tab.connectionId} onOpen={(b) => openBucket(tab.id, b)} />
+                }
               >
                 <FileBrowser tab={tab} />
               </Show>

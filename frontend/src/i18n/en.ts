@@ -147,7 +147,8 @@ export const en = {
     chooseDestConn: "Destination connection",
     chooseDestBucket: "Destination bucket",
     chooseDestPrefix: "Destination path (prefix)",
-    crossConnMoveHint: "Moving across connections downloads then re-uploads each object, then deletes the source.",
+    crossConnMoveHint:
+      "Moving across connections downloads then re-uploads each object, then deletes the source.",
     sortBy: "Sort by",
   },
   queue: {
@@ -278,7 +279,8 @@ export const en = {
     grants: "Grants",
     applyAcl: "Apply ACL",
     aclApplied: "ACL applied",
-    restoreHint: "Restore an archived (Glacier / Deep Archive) object to make it temporarily retrievable.",
+    restoreHint:
+      "Restore an archived (Glacier / Deep Archive) object to make it temporarily retrievable.",
     restoreDays: "Available for (days)",
     restoreTier: "Retrieval tier",
     restore: "Request restore",
@@ -336,7 +338,7 @@ export const en = {
     byStorageClass: "By storage class",
   },
   bucketSettings: {
-    title: 'Bucket Settings — {{ name }}',
+    title: "Bucket Settings — {{ name }}",
     general: "General",
     policy: "Policy",
     cors: "CORS",

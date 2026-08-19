@@ -1,6 +1,7 @@
 package s3x
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"mime"
@@ -13,6 +14,11 @@ import (
 )
 
 // ProgressFunc reports cumulative bytes transferred.
+//
+// Parallel transfers (multipart upload, ranged download) call it concurrently
+// from several goroutines, so implementations must be safe for concurrent use.
+// The reported value is monotonically non-decreasing within a single pass, but a
+// body that the SDK rewinds to hash or retry restarts the count.
 type ProgressFunc func(transferred int64)
 
 // MinPartSize is the S3 multipart minimum (5 MiB) for all but the final part.
@@ -64,7 +70,7 @@ func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, m
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		return err
@@ -79,7 +85,7 @@ func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, m
 		in := &s3.PutObjectInput{
 			Bucket:        aws.String(bucket),
 			Key:           aws.String(key),
-			Body:          &progressReader{r: f, onProgress: onProgress},
+			Body:          newProgressBody(f, onProgress),
 			ContentLength: aws.Int64(size),
 			ContentType:   aws.String(ct),
 		}
@@ -88,6 +94,21 @@ func Upload(ctx context.Context, cl *s3.Client, bucket, key, localPath string, m
 		return err
 	}
 	return multipartUploadParallel(ctx, cl, bucket, key, f, size, ct, partSize, opts, onProgress)
+}
+
+// newProgressBody wraps a request body so it reports cumulative bytes read.
+//
+// Seekability matters: over an https endpoint the SDK signs S3 payloads as
+// UNSIGNED-PAYLOAD and streams the body once, but over a plain http endpoint —
+// which self-hosted MinIO installs commonly are — it must hash the body first,
+// which means rewinding it. It also rewinds to retry a failed request. Wrapping
+// a seekable source in a plain io.Reader therefore breaks uploads outright on
+// http endpoints, so the wrapper forwards Seek whenever the source supports it.
+func newProgressBody(r io.Reader, onProgress ProgressFunc) io.Reader {
+	if rs, ok := r.(io.ReadSeeker); ok {
+		return &progressReadSeeker{progressReader{r: rs, onProgress: onProgress}}
+	}
+	return &progressReader{r: r, onProgress: onProgress}
 }
 
 // progressReader wraps a reader to report cumulative bytes read.
@@ -106,6 +127,19 @@ func (p *progressReader) Read(b []byte) (int, error) {
 		}
 	}
 	return n, err
+}
+
+// progressReadSeeker exposes the source's Seek so the SDK can hash and retry the
+// body. Rewinding resets the counter, so the progress reported during the pass
+// that actually transmits is accurate.
+type progressReadSeeker struct{ progressReader }
+
+func (p *progressReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	pos, err := p.r.(io.Seeker).Seek(offset, whence)
+	if err == nil {
+		p.total = pos
+	}
+	return pos, err
 }
 
 // DownloadOptions tunes how an object is fetched. When Multipart is set and the
@@ -141,7 +175,7 @@ func Download(ctx context.Context, cl *s3.Client, bucket, key, localPath string,
 	if err != nil {
 		return err
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 
 	f, err := os.Create(tmp)
 	if err != nil {
@@ -150,20 +184,30 @@ func Download(ctx context.Context, cl *s3.Client, bucket, key, localPath string,
 	_, err = copyWithContext(ctx, f, out.Body, onProgress)
 	closeErr := f.Close()
 	if err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return err
 	}
 	if closeErr != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return closeErr
 	}
 	return os.Rename(tmp, localPath)
 }
 
-// StreamCopy copies an object across two (possibly different) connections/clients
-// by streaming the source body straight into a destination upload. Used for
-// cross-account / cross-endpoint copy where server-side CopyObject cannot reach.
-func StreamCopy(ctx context.Context, src, dst *s3.Client, srcBucket, srcKey, dstBucket, dstKey string, opts UploadOptions, onProgress ProgressFunc) error {
+// StreamCopy copies an object across two (possibly different) connections or
+// endpoints by pumping the source body into a destination upload. It is used for
+// cross-account / cross-endpoint copies, where a server-side CopyObject cannot
+// reach the destination.
+//
+// The source body is an HTTP stream and therefore not seekable, which the SDK
+// requires to sign and retry a request. Bytes are staged through a buffer of at
+// most partSize instead: a small object becomes one PutObject, a large one a
+// sequential multipart upload. Memory stays bounded by partSize either way and
+// no temporary file is needed.
+func StreamCopy(ctx context.Context, src, dst *s3.Client, srcBucket, srcKey, dstBucket, dstKey string, partSize int64, opts UploadOptions, onProgress ProgressFunc) error {
+	if partSize < MinPartSize {
+		partSize = MinPartSize
+	}
 	head, err := src.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(srcBucket), Key: aws.String(srcKey)})
 	if err != nil {
 		return err
@@ -175,20 +219,32 @@ func StreamCopy(ctx context.Context, src, dst *s3.Client, srcBucket, srcKey, dst
 	if err != nil {
 		return err
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 
-	in := &s3.PutObjectInput{
-		Bucket:        aws.String(dstBucket),
-		Key:           aws.String(dstKey),
-		Body:          &progressReader{r: out.Body, onProgress: onProgress},
-		ContentLength: aws.Int64(size),
+	if size <= partSize {
+		body, err := io.ReadAll(io.LimitReader(out.Body, partSize+1))
+		if err != nil {
+			return err
+		}
+		in := &s3.PutObjectInput{
+			Bucket:        aws.String(dstBucket),
+			Key:           aws.String(dstKey),
+			Body:          bytes.NewReader(body),
+			ContentLength: aws.Int64(int64(len(body))),
+		}
+		if ct != "" {
+			in.ContentType = aws.String(ct)
+		}
+		opts.applyPut(in)
+		if _, err := dst.PutObject(ctx, in); err != nil {
+			return err
+		}
+		if onProgress != nil {
+			onProgress(int64(len(body)))
+		}
+		return nil
 	}
-	if ct != "" {
-		in.ContentType = aws.String(ct)
-	}
-	opts.applyPut(in)
-	_, err = dst.PutObject(ctx, in)
-	return err
+	return multipartUploadStream(ctx, dst, dstBucket, dstKey, out.Body, ct, partSize, opts, onProgress)
 }
 
 // ObjectSize returns the content length of an object via HeadObject.

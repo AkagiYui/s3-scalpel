@@ -73,9 +73,9 @@ func (q *windowQueue) execute(ctx context.Context, t *model.Task) error {
 		}
 		return s3x.DeleteObject(ctx, cl, t.Bucket, t.Key, "")
 	case model.TaskCopy:
-		return q.copy(ctx, cl, t, onProgress)
+		return q.copy(ctx, cl, t, s, onProgress)
 	case model.TaskMove:
-		if err := q.copy(ctx, cl, t, onProgress); err != nil {
+		if err := q.copy(ctx, cl, t, s, onProgress); err != nil {
 			return err
 		}
 		return s3x.DeleteObject(ctx, cl, t.Bucket, t.Key, "")
@@ -87,7 +87,7 @@ func (q *windowQueue) execute(ctx context.Context, t *model.Task) error {
 // copy performs a copy for a task, using a server-side CopyObject when source and
 // destination share a connection, and a streaming cross-connection copy when the
 // destination is a different connection (different account/endpoint).
-func (q *windowQueue) copy(ctx context.Context, srcClient *s3.Client, t *model.Task, onProgress s3x.ProgressFunc) error {
+func (q *windowQueue) copy(ctx context.Context, srcClient *s3.Client, t *model.Task, s model.AppSettings, onProgress s3x.ProgressFunc) error {
 	if t.DestConnID == "" || t.DestConnID == t.ConnectionID {
 		return s3x.CopyObject(ctx, srcClient, t.Bucket, t.Key, t.DestBucket, t.DestKey)
 	}
@@ -99,5 +99,10 @@ func (q *windowQueue) copy(ctx context.Context, srcClient *s3.Client, t *model.T
 	if err != nil {
 		return err
 	}
-	return s3x.StreamCopy(ctx, srcClient, destClient, t.Bucket, t.Key, t.DestBucket, t.DestKey, s3x.UploadOptions{}, onProgress)
+	return s3x.StreamCopy(ctx, srcClient, destClient, t.Bucket, t.Key, t.DestBucket, t.DestKey,
+		s.PartSize, s3x.UploadOptions{
+			StorageClass: s.UploadStorageClass,
+			SSEAlgorithm: s.UploadSSE,
+			KMSKeyID:     s.UploadKMSKeyID,
+		}, onProgress)
 }

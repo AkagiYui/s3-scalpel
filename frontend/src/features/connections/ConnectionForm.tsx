@@ -1,5 +1,12 @@
 import { createSignal, createEffect, Show, type Component } from "solid-js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Input, Label, Textarea } from "~/components/ui/primitives";
 import { SimpleSelect } from "~/components/ui/select";
@@ -183,9 +190,14 @@ export const ConnectionForm: Component<{
               <div class="flex items-center justify-between">
                 <div>
                   <div class="text-sm font-medium">{t("connections.skipTlsVerify")}</div>
-                  <div class="text-xs text-muted-foreground">{t("connections.skipTlsVerifyHint")}</div>
+                  <div class="text-xs text-muted-foreground">
+                    {t("connections.skipTlsVerifyHint")}
+                  </div>
                 </div>
-                <Switch checked={form().skipTlsVerify ?? false} onChange={(v) => set("skipTlsVerify", v)} />
+                <Switch
+                  checked={form().skipTlsVerify ?? false}
+                  onChange={(v) => set("skipTlsVerify", v)}
+                />
               </div>
               <div class="grid gap-1.5">
                 <Label>{t("connections.caCert")}</Label>

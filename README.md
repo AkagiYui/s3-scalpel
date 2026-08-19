@@ -40,9 +40,9 @@ Bundle identifier: `com.akagiyui.s3_scalpel`
 ## Prerequisites
 
 - [Go](https://go.dev/) 1.25+
-- [Node](https://nodejs.org/) 20.19+ / 22.12+ (Vite 8 requirement)
+- [Node](https://nodejs.org/) 22.12+ (Vite 8 requirement)
 - [pnpm](https://pnpm.io/) (the frontend package manager)
-- [Wails 3 CLI](https://v3.wails.io/) (`wails3`)
+- [Wails 3 CLI](https://v3.wails.io/) (`wails3`, v3.0.0-beta.10)
 
 ## Development
 
@@ -51,6 +51,14 @@ wails3 dev
 ```
 
 Runs the app with hot-reload. The frontend dev server (Vite 8) runs on port 9245.
+
+`frontend/bindings` holds the generated TypeScript bridge to the Go services. It is
+**not** committed; `wails3 dev` and `wails3 task build` regenerate it automatically, and
+a bare frontend checkout needs one explicit pass before type-checking:
+
+```sh
+wails3 generate bindings -clean=true
+```
 
 > Note: macOS system notifications require a real `.app` bundle, so they are disabled in
 > the bare-binary `wails3 dev` workflow and enabled in packaged builds.
@@ -61,6 +69,11 @@ Runs the app with hot-reload. The frontend dev server (Vite 8) runs on port 9245
 wails3 task build      # compile the binary into ./bin
 wails3 task package    # produce a distributable bundle (.app on macOS)
 ```
+
+The application version lives in the root `VERSION` file and is embedded at compile
+time; `build/config.yml` must carry the same value (a unit test enforces it). `COMMIT`
+identifies the individual build and is rewritten by CI with the short SHA (or the
+release tag); it stays `dev` locally.
 
 ## Project layout
 
@@ -73,17 +86,43 @@ internal/store       atomic JSON persistence
 internal/s3x         AWS SDK v2 wrapper (client cache, operations, transfers)
 internal/queue       per-window operation queue (scheduling, retry, persistence)
 frontend/src         SolidJS app (pages, features/storage, components/ui, i18n, stores)
+VERSION / COMMIT     embedded build identity (see Build)
 ```
+
+## Code quality
+
+```sh
+gofmt -l .                        # formatting
+go vet ./...                      # vet
+golangci-lint run ./...           # lint (config in .golangci.yml)
+
+cd frontend
+pnpm run format:check             # prettier
+pnpm run lint                     # eslint
+pnpm run typecheck                # tsc --noEmit
+```
+
+CI runs all of the above on every push and pull request.
 
 ## Testing
 
-Unit tests cover the queue (crash recovery, control ops, persistence) and path helpers:
+The Go suite covers the queue (crash recovery, cancellation classification, control
+ops, persistence), the encrypted store, the S3 client cache and — through an in-memory
+fake S3 server — listing/pagination, recursive delete, single and multipart upload,
+ranged parallel download and cross-endpoint streaming copy:
 
 ```sh
-go test ./...
+go test -race ./...
 ```
 
-An end-to-end integration test against a live endpoint is included but **skipped unless
+The frontend suite (Vitest) covers the object list helpers, formatting utilities, the
+tab store and dictionary parity between the two languages:
+
+```sh
+cd frontend && pnpm run test:run
+```
+
+An additional end-to-end test against a live endpoint is included but **skipped unless
 credentials are supplied via the environment** (so no secrets live in the repo):
 
 ```sh
@@ -96,4 +135,4 @@ go test ./internal/s3x -run TestIntegration -v
 
 ## License
 
-MIT
+[MIT](LICENSE)

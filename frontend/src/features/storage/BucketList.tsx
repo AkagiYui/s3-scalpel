@@ -74,7 +74,14 @@ export const BucketList: Component<{
       </div>
 
       <div class="flex-1 overflow-y-auto p-4">
-        <Show when={!buckets.loading} fallback={<div class="flex justify-center py-12"><Spinner class="h-6 w-6" /></div>}>
+        <Show
+          when={!buckets.loading}
+          fallback={
+            <div class="flex justify-center py-12">
+              <Spinner class="h-6 w-6" />
+            </div>
+          }
+        >
           <Show
             when={buckets()?.length}
             fallback={
@@ -105,7 +112,11 @@ export const BucketList: Component<{
                     <Button size="icon-sm" variant="ghost" onClick={() => props.onOpen(b.name)}>
                       <FolderOpen class="h-4 w-4" />
                     </Button>
-                    <Button size="icon-sm" variant="ghost" onClick={() => setSettingsBucket(b.name)}>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={() => setSettingsBucket(b.name)}
+                    >
                       <Settings2 class="h-4 w-4" />
                     </Button>
                     <Button

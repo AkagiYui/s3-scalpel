@@ -17,14 +17,21 @@ async function copy(text: string) {
   }
 }
 
-const Field: Component<{ label: string; value?: string; mono?: boolean; copyable?: boolean }> = (props) => (
+const Field: Component<{ label: string; value?: string; mono?: boolean; copyable?: boolean }> = (
+  props
+) => (
   <Show when={props.value}>
     <div class="grid grid-cols-[8rem_1fr] gap-2 py-1.5 text-sm">
       <span class="text-muted-foreground">{props.label}</span>
       <div class="flex items-start gap-1.5">
-        <span class={`selectable break-all ${props.mono ? "font-mono text-xs" : ""}`}>{props.value}</span>
+        <span class={`selectable break-all ${props.mono ? "font-mono text-xs" : ""}`}>
+          {props.value}
+        </span>
         <Show when={props.copyable}>
-          <button class="shrink-0 text-muted-foreground hover:text-foreground" onClick={() => copy(props.value!)}>
+          <button
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => copy(props.value!)}
+          >
             <Copy class="h-3 w-3" />
           </button>
         </Show>
@@ -51,15 +58,28 @@ export const PropertiesDialog: Component<{
         <DialogHeader>
           <DialogTitle>{t("properties.title")}</DialogTitle>
         </DialogHeader>
-        <Show when={!data.loading} fallback={<div class="flex justify-center py-8"><Spinner class="h-6 w-6" /></div>}>
+        <Show
+          when={!data.loading}
+          fallback={
+            <div class="flex justify-center py-8">
+              <Spinner class="h-6 w-6" />
+            </div>
+          }
+        >
           <Show when={data()}>
             {(p) => (
               <div class="divide-y">
                 <Field label={t("properties.key")} value={p().key} mono copyable />
-                <Field label={t("properties.size")} value={`${formatBytes(p().size)} (${p().size} B)`} />
+                <Field
+                  label={t("properties.size")}
+                  value={`${formatBytes(p().size)} (${p().size} B)`}
+                />
                 <Field label={t("properties.contentType")} value={p().contentType} />
                 <Field label={t("properties.etag")} value={p().etag} mono copyable />
-                <Field label={t("properties.lastModified")} value={formatDate(p().lastModified, effectiveLocale())} />
+                <Field
+                  label={t("properties.lastModified")}
+                  value={formatDate(p().lastModified, effectiveLocale())}
+                />
                 <Field label={t("properties.storageClass")} value={p().storageClass} />
                 <Field label={t("properties.versionId")} value={p().versionId} mono />
                 <Field label={t("properties.cacheControl")} value={p().cacheControl} />
@@ -68,7 +88,9 @@ export const PropertiesDialog: Component<{
                   <div class="mb-1 text-sm text-muted-foreground">{t("properties.metadata")}</div>
                   <Show
                     when={p().metadata && Object.keys(p().metadata).length}
-                    fallback={<div class="text-xs text-muted-foreground">{t("properties.noMetadata")}</div>}
+                    fallback={
+                      <div class="text-xs text-muted-foreground">{t("properties.noMetadata")}</div>
+                    }
                   >
                     <div class="rounded-md bg-muted/50 p-2 font-mono text-xs">
                       <For each={Object.entries(p().metadata)}>

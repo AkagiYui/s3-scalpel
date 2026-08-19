@@ -1,5 +1,11 @@
 import { createSignal, createEffect, For, Show, type Component } from "solid-js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Spinner } from "~/components/ui/primitives";
 import { S3Service, type PrefixStats } from "~/lib/api";
@@ -50,8 +56,17 @@ export const StatsDialog: Component<{
         <DialogHeader>
           <DialogTitle>{t("stats.title")}</DialogTitle>
         </DialogHeader>
-        <div class="truncate font-mono text-xs text-muted-foreground">{props.bucket}/{props.prefix || ""}</div>
-        <Show when={!loading()} fallback={<div class="flex justify-center py-10"><Spinner class="h-6 w-6" /></div>}>
+        <div class="truncate font-mono text-xs text-muted-foreground">
+          {props.bucket}/{props.prefix || ""}
+        </div>
+        <Show
+          when={!loading()}
+          fallback={
+            <div class="flex justify-center py-10">
+              <Spinner class="h-6 w-6" />
+            </div>
+          }
+        >
           <Show when={stats()}>
             <div class="flex flex-col gap-3 py-1">
               <div class="grid grid-cols-2 gap-3">
@@ -72,7 +87,9 @@ export const StatsDialog: Component<{
                       {(c) => (
                         <div class="grid grid-cols-[1fr_5rem_6rem] gap-2 rounded border px-2 py-1 text-xs">
                           <span class="font-mono">{c.name}</span>
-                          <span class="text-right text-muted-foreground">{c.count.toLocaleString()}</span>
+                          <span class="text-right text-muted-foreground">
+                            {c.count.toLocaleString()}
+                          </span>
                           <span class="text-right">{formatBytes(c.size)}</span>
                         </div>
                       )}
@@ -84,7 +101,9 @@ export const StatsDialog: Component<{
           </Show>
         </Show>
         <DialogFooter>
-          <Button variant="outline" onClick={() => props.onOpenChange(false)}>{t("common.close")}</Button>
+          <Button variant="outline" onClick={() => props.onOpenChange(false)}>
+            {t("common.close")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
