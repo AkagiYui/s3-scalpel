@@ -1,6 +1,15 @@
 import { createSignal, For, Show, onMount, onCleanup, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Plus, Pencil, Trash2, Database, ExternalLink, Globe, ShieldCheck } from "lucide-solid";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Database,
+  ExternalLink,
+  Globe,
+  ShieldCheck,
+  ShieldAlert,
+} from "lucide-solid";
 import { PageHeader } from "~/components/PageHeader";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/primitives";
@@ -15,6 +24,11 @@ import { toast } from "~/components/ui/toast";
 import { formatDate } from "~/lib/utils";
 import { effectiveLocale } from "~/stores/settings";
 import { t } from "~/i18n";
+
+/** An endpoint served over plain http exposes the request to anyone on the path. */
+function isPlainHTTP(endpoint: string): boolean {
+  return /^http:\/\//i.test(endpoint.trim());
+}
 import * as bus from "~/lib/bus";
 
 const Connections: Component = () => {
@@ -93,6 +107,28 @@ const Connections: Component = () => {
                             ? t("connections.pathStyle")
                             : t("connections.virtualHosted")}
                         </Badge>
+                        {/* A disabled certificate check is easy to switch on and
+                            then forget about, so it stays visible on the card. */}
+                        <Show when={c.skipTlsVerify}>
+                          <Badge
+                            variant="destructive"
+                            class="gap-1"
+                            title={t("connections.skipTlsVerifyHint")}
+                          >
+                            <ShieldAlert class="h-3 w-3" />
+                            {t("connections.insecureBadge")}
+                          </Badge>
+                        </Show>
+                        <Show when={isPlainHTTP(c.endpoint)}>
+                          <Badge
+                            variant="warning"
+                            class="gap-1"
+                            title={t("connections.plainHttpHint")}
+                          >
+                            <ShieldAlert class="h-3 w-3" />
+                            {t("connections.plainHttpBadge")}
+                          </Badge>
+                        </Show>
                       </div>
                       <div class="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                         <Globe class="h-3 w-3 shrink-0" />

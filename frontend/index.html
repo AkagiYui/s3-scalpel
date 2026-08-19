@@ -3,9 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The webview only ever talks to the Go side; every S3 request is made by the
+      backend, so the page needs no outbound origins of its own. The exception is
+      media: audio and video previews stream straight from a presigned URL on an
+      arbitrary S3 endpoint, so media-src has to stay open. Image, PDF and text
+      previews arrive as data: URLs and need no network at all.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' 'unsafe-inline' data: blob: wails: https: http: mediastream:; img-src 'self' data: blob: https: http:; media-src 'self' blob: data: https: http:; connect-src 'self' wails: https: http: ws: wss:;"
+      content="default-src 'self';
+               script-src 'self' 'wasm-unsafe-eval';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: blob:;
+               font-src 'self' data:;
+               media-src 'self' blob: data: https: http:;
+               object-src 'self' data: blob:;
+               frame-src 'self' data: blob:;
+               connect-src 'self' wails: ws: wss:;
+               worker-src 'self' blob:;
+               base-uri 'self';
+               form-action 'none';
+               frame-ancestors 'none'"
     />
     <title>S3 Scalpel</title>
   </head>

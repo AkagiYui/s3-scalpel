@@ -56,6 +56,9 @@ export const en = {
     close: "Close",
   },
   connections: {
+    insecureBadge: "TLS unchecked",
+    plainHttpBadge: "Not encrypted",
+    plainHttpHint: "This endpoint uses plain http, so requests and object data travel unencrypted.",
     title: "Connection Manager",
     subtitle: "Manage your S3-compatible storage accounts",
     add: "Add Connection",
@@ -201,6 +204,16 @@ export const en = {
     },
   },
   settings: {
+    passphrase: "Passphrase",
+    passphraseExportTitle: "Protect this export",
+    passphraseExportHint:
+      "Credentials are exported encrypted. You will need this passphrase to import the file again — it cannot be recovered.",
+    passphraseImportTitle: "Encrypted export",
+    passphraseImportHint: "This file is encrypted. Enter the passphrase it was exported with.",
+    keyStorage: "Credential key storage",
+    keyStorageHint: "Where the key that encrypts your saved credentials is kept.",
+    keyStorageKeyring: "OS credential store",
+    keyStorageFile: "Local file (no credential store available)",
     conflictPolicy: "When the destination exists",
     conflictOverwrite: "Overwrite",
     conflictSkip: "Skip",
@@ -247,7 +260,8 @@ export const en = {
     exportSettings: "Export settings",
     importSettings: "Import settings",
     includeSensitive: "Include access keys & secrets",
-    includeSensitiveHint: "When off, credentials are excluded from the export file.",
+    includeSensitiveHint:
+      "Access keys and session tokens are included, and the file is sealed with a passphrase you choose.",
     exported: "Settings exported to {{ path }}",
     imported: "Settings imported",
     about: "About",

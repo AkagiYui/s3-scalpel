@@ -20,6 +20,8 @@ export const PromptDialog: Component<{
   placeholder?: string;
   initial?: string;
   confirmText?: string;
+  /** Render the field as a password input (passphrases, secrets). */
+  password?: boolean;
   onSubmit: (value: string) => void | Promise<void>;
 }> = (props) => {
   const [value, setValue] = createSignal("");
@@ -52,6 +54,8 @@ export const PromptDialog: Component<{
         </DialogHeader>
         <Input
           autofocus
+          type={props.password ? "password" : "text"}
+          autocomplete={props.password ? "new-password" : "off"}
           value={value()}
           placeholder={props.placeholder}
           onInput={(e) => setValue(e.currentTarget.value)}

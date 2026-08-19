@@ -53,13 +53,12 @@ func TestEncryptedRoundTrip(t *testing.T) {
 		t.Errorf("missing file: ok=%v err=%v", ok, err)
 	}
 
-	// The key file must be present and 0600.
-	info, err := os.Stat(filepath.Join(dir, keyFile))
-	if err != nil {
-		t.Fatalf("key file: %v", err)
+	// With a credential store available the key lives there, not on disk.
+	if got := s.KeySource(); got != KeySourceKeyring {
+		t.Errorf("key source = %q, want %q", got, KeySourceKeyring)
 	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("key file perm = %v, want 0600", info.Mode().Perm())
+	if _, err := os.Stat(filepath.Join(dir, keyFile)); !os.IsNotExist(err) {
+		t.Error("no key file should be written when the OS credential store works")
 	}
 }
 

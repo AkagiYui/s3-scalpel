@@ -41,6 +41,7 @@ import {
   TabSession,
   WindowSession,
   WindowBounds,
+  ImportProbe,
 } from "../../bindings/s3scalpel/internal/model/models";
 
 export {
@@ -71,6 +72,7 @@ export {
   TabSession,
   WindowSession,
   WindowBounds,
+  ImportProbe,
 };
 
 /** The current window id, supplied by the backend via the URL query string. */

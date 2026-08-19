@@ -13,6 +13,10 @@ import (
 	"s3scalpel/internal/s3x"
 )
 
+// previewURLExpiry bounds the life of the presigned URL used to stream audio and
+// video previews.
+const previewURLExpiry = time.Hour
+
 // PreviewService prepares object previews. Images, PDFs and text are downloaded
 // to a temp directory (bounded by the preview size limit) and returned as data;
 // audio/video are streamed from a presigned URL.
@@ -42,7 +46,9 @@ func (s *PreviewService) GetPreview(connID, bucket, key string) (model.PreviewDa
 
 	switch kind {
 	case model.PreviewMedia:
-		url, err := s3x.PresignGet(ctx, cl, bucket, key, "", 6*time.Hour)
+		// Long enough to watch a film, short enough that a URL leaked from the
+		// webview (devtools, a copied link) stops working the same day.
+		url, err := s3x.PresignGet(ctx, cl, bucket, key, "", previewURLExpiry)
 		if err != nil {
 			return out, err
 		}

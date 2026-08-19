@@ -15,14 +15,19 @@ import (
 	"sync"
 )
 
-// keyFile holds the locally-generated 32-byte key used to encrypt sensitive
-// files at rest. It is created with 0600 permissions on first use.
+// keyFile is the fallback location for the 32-byte key that encrypts sensitive
+// files at rest, used only when no OS credential store is reachable. See
+// keyring.go for the resolution order.
 const keyFile = ".s3scalpel.key"
 
 // Store owns a base directory and serialises writes per file path.
 type Store struct {
 	baseDir string
 	mu      sync.Mutex
+
+	keyMu     sync.Mutex
+	cachedKey []byte
+	keySrc    keySource
 }
 
 // New creates a Store rooted at baseDir, creating the directory if needed and
@@ -87,25 +92,6 @@ func (s *Store) WriteJSON(name string, v any) error {
 		return err
 	}
 	return writeFileAtomic(s.Path(name), data)
-}
-
-// key returns the per-installation encryption key, generating and persisting it
-// (0600) the first time. The key lives beside the data so this protects against
-// casual disk inspection and accidental sharing of the config file, not against
-// an attacker with full read access to the data directory.
-func (s *Store) key() ([]byte, error) {
-	path := s.Path(keyFile)
-	if data, err := os.ReadFile(path); err == nil && len(data) == 32 {
-		return data, nil
-	}
-	k := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, k); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(path, k, 0o600); err != nil {
-		return nil, err
-	}
-	return k, nil
 }
 
 // WriteEncrypted marshals v to JSON and writes it AES-256-GCM encrypted.

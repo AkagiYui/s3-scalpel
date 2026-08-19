@@ -240,3 +240,10 @@ type WindowSession struct {
 	Bounds WindowBounds `json:"bounds"`
 	Tabs   []TabSession `json:"tabs"`
 }
+
+// ImportProbe is the result of picking a settings file for import: where it is
+// and whether it is passphrase-encrypted.
+type ImportProbe struct {
+	Path      string `json:"path"`
+	Encrypted bool   `json:"encrypted"`
+}

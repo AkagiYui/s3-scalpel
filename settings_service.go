@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"s3scalpel/internal/model"
+	"s3scalpel/internal/store"
 )
 
 // SettingsService exposes application settings to the frontend.
@@ -28,14 +29,26 @@ type settingsBundle struct {
 	Sensitive   bool               `json:"sensitive"`
 }
 
-// Export writes all settings (and connections) to a user-chosen JSON file.
-// When includeSensitive is false, access/secret keys are blanked.
-func (s *SettingsService) Export(includeSensitive bool) (string, error) {
+// Export writes all settings (and connections) to a user-chosen file.
+//
+// Credentials never leave the app as plaintext: including them requires a
+// passphrase, and the file is then sealed with AES-256-GCM under an Argon2id key.
+// Without credentials the export stays plain JSON, which is convenient to diff
+// and carries nothing sensitive.
+func (s *SettingsService) Export(includeSensitive bool, passphrase string) (string, error) {
 	if s.core.app == nil {
 		return "", fmt.Errorf("app not ready")
 	}
+	if includeSensitive && passphrase == "" {
+		return "", fmt.Errorf("a passphrase is required to export credentials")
+	}
+
+	filename := "s3scalpel-settings.json"
+	if includeSensitive {
+		filename = "s3scalpel-settings.encrypted.json"
+	}
 	path, err := s.core.app.Dialog.SaveFile().
-		SetFilename("s3scalpel-settings.json").
+		SetFilename(filename).
 		AddFilter("JSON", "*.json").
 		PromptForSingleSelection()
 	if err != nil {
@@ -53,6 +66,7 @@ func (s *SettingsService) Export(includeSensitive bool) (string, error) {
 		for i := range conns {
 			conns[i].AccessKey = ""
 			conns[i].SecretKey = ""
+			conns[i].SessionToken = ""
 		}
 	}
 	bundle := settingsBundle{
@@ -61,7 +75,13 @@ func (s *SettingsService) Export(includeSensitive bool) (string, error) {
 		Connections: conns,
 		Sensitive:   includeSensitive,
 	}
-	data, err := json.MarshalIndent(bundle, "", "  ")
+
+	var data []byte
+	if includeSensitive {
+		data, err = store.SealExport(bundle, passphrase)
+	} else {
+		data, err = json.MarshalIndent(bundle, "", "  ")
+	}
 	if err != nil {
 		return "", err
 	}
@@ -71,19 +91,34 @@ func (s *SettingsService) Export(includeSensitive bool) (string, error) {
 	return path, nil
 }
 
-// Import loads settings (and connections) from a user-chosen JSON file. Imported
-// connections are merged by id; settings are replaced.
-func (s *SettingsService) Import() (bool, error) {
+// ImportNeedsPassphrase asks the user for a file and reports whether it is
+// sealed, so the frontend knows to prompt before calling Import. It returns the
+// chosen path, which Import then reads.
+func (s *SettingsService) ImportNeedsPassphrase() (model.ImportProbe, error) {
 	if s.core.app == nil {
-		return false, fmt.Errorf("app not ready")
+		return model.ImportProbe{}, fmt.Errorf("app not ready")
 	}
 	path, err := s.core.app.Dialog.OpenFile().
 		CanChooseFiles(true).
 		AddFilter("JSON", "*.json").
 		PromptForSingleSelection()
 	if err != nil {
-		return false, err
+		return model.ImportProbe{}, err
 	}
+	if path == "" {
+		return model.ImportProbe{}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return model.ImportProbe{}, err
+	}
+	return model.ImportProbe{Path: path, Encrypted: store.IsSealedExport(data)}, nil
+}
+
+// Import loads settings (and connections) from a file previously chosen through
+// ImportNeedsPassphrase. Imported connections are merged by id; settings are
+// replaced. A sealed file needs the passphrase it was exported with.
+func (s *SettingsService) Import(path, passphrase string) (bool, error) {
 	if path == "" {
 		return false, nil
 	}
@@ -92,7 +127,14 @@ func (s *SettingsService) Import() (bool, error) {
 		return false, err
 	}
 	var bundle settingsBundle
-	if err := json.Unmarshal(data, &bundle); err != nil {
+	if store.IsSealedExport(data) {
+		if passphrase == "" {
+			return false, fmt.Errorf("this export is encrypted; a passphrase is required")
+		}
+		if err := store.OpenExport(data, passphrase, &bundle); err != nil {
+			return false, err
+		}
+	} else if err := json.Unmarshal(data, &bundle); err != nil {
 		return false, fmt.Errorf("invalid settings file: %w", err)
 	}
 
@@ -117,6 +159,9 @@ func (s *SettingsService) Import() (bool, error) {
 				}
 				if c.SecretKey == "" {
 					c.SecretKey = s.core.conns[i].SecretKey
+				}
+				if c.SessionToken == "" {
+					c.SessionToken = s.core.conns[i].SessionToken
 				}
 				s.core.conns[i] = c
 			} else {

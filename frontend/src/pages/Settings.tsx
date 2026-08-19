@@ -11,6 +11,7 @@ import {
   Database,
 } from "lucide-solid";
 import { PageHeader } from "~/components/PageHeader";
+import { PromptDialog } from "~/features/storage/PromptDialog";
 import {
   Card,
   CardHeader,
@@ -66,6 +67,8 @@ const Row: Component<{ label: string; hint?: string; children: JSX.Element }> = 
 const Settings: Component = () => {
   const [info, setInfo] = createSignal<AppInfo | null>(null);
   const [includeSensitive, setIncludeSensitive] = createSignal(false);
+  const [passphrasePrompt, setPassphrasePrompt] = createSignal<"export" | "import" | null>(null);
+  const [importPath, setImportPath] = createSignal("");
   let aboutRef: HTMLDivElement | undefined;
 
   onMount(async () => {
@@ -81,9 +84,19 @@ const Settings: Component = () => {
   const partMB = () => Math.round(settings().partSize / MB);
   const previewMB = () => Math.round(settings().previewMaxSize / MB);
 
+  // Exporting credentials always seals the file with a passphrase, so an export
+  // never leaves keys sitting in readable JSON on disk.
   const exportSettings = async () => {
+    if (includeSensitive()) {
+      setPassphrasePrompt("export");
+      return;
+    }
+    await runExport("");
+  };
+
+  const runExport = async (passphrase: string) => {
     try {
-      const path = await SettingsService.Export(includeSensitive());
+      const path = await SettingsService.Export(includeSensitive(), passphrase);
       if (path) toast.success(t("settings.exported", { path }));
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
@@ -92,10 +105,27 @@ const Settings: Component = () => {
 
   const importSettings = async () => {
     try {
-      const ok = await SettingsService.Import();
+      const probe = await SettingsService.ImportNeedsPassphrase();
+      if (!probe?.path) return; // cancelled
+      setImportPath(probe.path);
+      if (probe.encrypted) {
+        setPassphrasePrompt("import");
+        return;
+      }
+      await runImport(probe.path, "");
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    }
+  };
+
+  const runImport = async (path: string, passphrase: string) => {
+    try {
+      const ok = await SettingsService.Import(path, passphrase);
       if (ok) toast.success(t("settings.imported"));
     } catch (e: any) {
       toast.error(String(e?.message ?? e));
+    } finally {
+      setImportPath("");
     }
   };
 
@@ -360,6 +390,31 @@ const Settings: Component = () => {
               </Button>
             </div>
           </Section>
+
+          <PromptDialog
+            open={passphrasePrompt() !== null}
+            onOpenChange={(o) => !o && setPassphrasePrompt(null)}
+            title={
+              passphrasePrompt() === "import"
+                ? t("settings.passphraseImportTitle")
+                : t("settings.passphraseExportTitle")
+            }
+            description={
+              passphrasePrompt() === "import"
+                ? t("settings.passphraseImportHint")
+                : t("settings.passphraseExportHint")
+            }
+            placeholder={t("settings.passphrase")}
+            password
+            confirmText={t("common.confirm")}
+            onSubmit={async (value) => {
+              const mode = passphrasePrompt();
+              setPassphrasePrompt(null);
+              if (!value) return;
+              if (mode === "import") await runImport(importPath(), value);
+              else await runExport(value);
+            }}
+          />
 
           {/* About */}
           <div ref={aboutRef}>

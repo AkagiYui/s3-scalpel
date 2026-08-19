@@ -50,6 +50,25 @@ Bundle identifier: `com.akagiyui.s3_scalpel`
 - **Persistence** — everything is stored in the platform-standard application data
   directory.
 
+## Security
+
+- **Credentials at rest** — access keys, secrets and session tokens are stored
+  AES-256-GCM encrypted. The encryption key lives in the OS credential store (macOS
+  Keychain, Windows Credential Manager, Linux Secret Service); a host without one falls
+  back to a 0600 file beside the data, and the About panel says which is in use. If the
+  credential store is present but refuses to answer, the app reports an error rather
+  than minting a fresh key that would orphan your saved connections.
+- **Exports** — an export that includes credentials is sealed with AES-256-GCM under an
+  Argon2id key derived from a passphrase you choose; keys never land in readable JSON.
+  Exports without credentials stay plain JSON.
+- **Transport warnings** — a connection with certificate verification disabled, or one
+  pointing at a plain `http://` endpoint, is flagged on its card in the connection list,
+  not just inside the edit form.
+- **Content-Security-Policy** — the webview makes no outbound requests of its own (all
+  S3 traffic goes through the Go backend), so the policy is `default-src 'self'` with a
+  narrow set of exceptions; only `media-src` stays open, because audio and video
+  previews stream directly from a presigned URL.
+
 ## Prerequisites
 
 - [Go](https://go.dev/) 1.25+

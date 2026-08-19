@@ -25,6 +25,9 @@ type AppInfo struct {
 	CacheDir     string `json:"cacheDir"`
 	GoVersion    string `json:"goVersion"`
 	WindowCount  int    `json:"windowCount"`
+	// KeyStorage says where the credential-encryption key lives: "keyring" (the
+	// OS credential store) or "file" (a 0600 file beside the data).
+	KeyStorage string `json:"keyStorage"`
 }
 
 // Info returns application and environment information.
@@ -39,6 +42,7 @@ func (s *AppService) Info() AppInfo {
 		CacheDir:     s.core.cacheDir,
 		GoVersion:    runtime.Version(),
 		WindowCount:  len(s.core.activeWindowIDs()),
+		KeyStorage:   string(s.core.store.KeySource()),
 	}
 }
 
