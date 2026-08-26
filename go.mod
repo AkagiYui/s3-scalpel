@@ -10,12 +10,11 @@ require (
 	github.com/aws/smithy-go v1.27.8
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.10
-	github.com/zalando/go-keyring v0.2.6
+	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.55.0
 )
 
 require (
-	al.essio.dev/pkg/shellescape v1.6.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.18 // indirect
