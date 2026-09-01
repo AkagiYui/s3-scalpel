@@ -21,7 +21,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: 检出代码
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # 标签必须与仓库里的 VERSION 一致，避免发出版本号对不上的包。
       - name: 比对标签与 VERSION
@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: 安装 Go
         uses: actions/setup-go@v6
