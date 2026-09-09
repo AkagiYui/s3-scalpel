@@ -1,6 +1,6 @@
 module s3scalpel
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.43.6
@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.10
 	github.com/zalando/go-keyring v0.2.6
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 )
 
 require (
