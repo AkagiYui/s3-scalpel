@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.2
 	github.com/aws/smithy-go v1.27.8
 	github.com/google/uuid v1.6.0
-	github.com/wailsapp/wails/v3 v3.0.0-beta.10
+	github.com/wailsapp/wails/v3 v3.0.0-beta.17
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.55.0
 )
